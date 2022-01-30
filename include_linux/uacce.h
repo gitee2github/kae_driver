@@ -172,10 +172,10 @@ struct uacce_device {
 struct uacce_device *uacce_alloc(struct device *parent,
 				 struct uacce_interface *interface);
 int uacce_register(struct uacce_device *uacce);
-int uacce_remove(struct uacce_device *uacce);
+void uacce_remove(struct uacce_device *uacce);
 struct uacce_device *dev_to_uacce(struct device *dev);
 void uacce_wake_up(struct uacce_queue *q);
-int uacce_hw_err_isolate(struct uacce *uacce);
+int uacce_hw_err_isolate(struct uacce_device *uacce);
 #else /* CONFIG_UACCE */
 
 static inline
@@ -190,14 +190,14 @@ static inline int uacce_register(struct uacce_device *uacce)
 	return -EINVAL;
 }
 
-static inline int uacce_remove(struct uacce_device *uacce) {}
+static inline void uacce_remove(struct uacce_device *uacce) {}
 
 static inline struct uacce_device *dev_to_uacce(struct device *dev)
 {
 	return NULL;
 }
 static inline void uacce_wake_up(struct uacce_queue *q) {}
-int uacce_hw_err_isolate(struct uacce *uacce)
+int uacce_hw_err_isolate(struct uacce_device *uacce)
 {
 	return -EINVAL;
 }

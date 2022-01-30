@@ -106,7 +106,7 @@ struct hisi_acc_sgl_pool *hisi_acc_create_sgl_pool(struct device *dev,
 						  &block[i].sgl_dma,
 						  GFP_KERNEL);
 		if (!block[i].sgl) {
-			dev_err(dev, "Fail to allocate hw SG buffer!\n");
+			dev_err(dev, "Fail to allocate remained hw SG buffer!\n");
 			goto err_free_mem;
 		}
 
@@ -237,7 +237,7 @@ hisi_acc_sg_buf_map_to_hw_sgl(struct device *dev,
 
 	sg_n_mapped = dma_map_sg(dev, sgl, sg_n, DMA_BIDIRECTIONAL);
 	if (!sg_n_mapped) {
-		dev_err(dev, "DMA mapping for SG error\n");
+		dev_err(dev, "DMA mapping for SG error!\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -248,7 +248,7 @@ hisi_acc_sg_buf_map_to_hw_sgl(struct device *dev,
 
 	curr_hw_sgl = acc_get_sgl(pool, index, &curr_sgl_dma);
 	if (IS_ERR(curr_hw_sgl)) {
-		dev_err(dev, "Get SGL error\n");
+		dev_err(dev, "Get SGL error!\n");
 		dma_unmap_sg(dev, sgl, sg_n, DMA_BIDIRECTIONAL);
 		return ERR_PTR(-ENOMEM);
 	}

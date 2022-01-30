@@ -7,15 +7,16 @@
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-#include <linux/wait.h>
 #include "../include_uapi_linux/uacce.h"
 #include "../include_linux/uacce.h"
+#include <linux/wait.h>
 
 static struct class *uacce_class;
 static dev_t uacce_devt;
 static DEFINE_MUTEX(uacce_mutex);
 static DEFINE_XARRAY_ALLOC(uacce_xa);
 static const struct file_operations uacce_fops;
+
 static struct uacce_qfile_region noiommu_ss_default_qfr = {
 	.type	=	UACCE_QFRT_SS,
 };
@@ -166,9 +167,9 @@ out:
 	return 0;
 }
 
-static long uacce_cmd_shared_qfr(struc uacce_queue *src, int fd)
+static long uacce_cmd_shared_qfr(struct uacce_queue *src, int fd)
 {
-	struc device *dev = &src->uacce->dev;
+	struct device *dev = &src->uacce->dev;
 	struct file *filep = fget(fd);
 	struct uacce_queue *tgt;
 	int ret = -EINVAL;
@@ -212,7 +213,7 @@ out_with_fd:
 	return ret;
 }
 
-static long uacce_get_ss_dma(struct uacce_queue *q, void __usr *arg)
+static long uacce_get_ss_dma(struct uacce_queue *q, void __user *arg)
 {
 	struct uacce_device *uacce = q->uacce;
 	struct uacce_dma_slice *slice;
@@ -234,7 +235,7 @@ static long uacce_get_ss_dma(struct uacce_queue *q, void __usr *arg)
 	}
 
 	slice = q->qfrs[UACCE_QFRT_SS]->dma_list;
-	if (copy_from_usr(&slice_idx, arg, sizeof(unsigned long))) {
+	if (copy_from_user(&slice_idx, arg, sizeof(unsigned long))) {
 		dev_err(&uacce->dev, "copy_from_user fail!\n");
 		goto param_check;
 	}
@@ -259,7 +260,7 @@ static long uacce_get_ss_dma(struct uacce_queue *q, void __usr *arg)
 	}
 	dma = dma | ((size >> UACCE_GRAN_SHIFT) & UACCE_GRAN_NUM_MASK);
 	if (copy_to_user(arg, &dma, sizeof(unsigned long))) {
-		dev_err(&uacce->dev, "copy_from_user fail!\n");
+		dev_err(&uacce->dev, "copy_to_user fail!\n");
 		goto param_check;
 	}
 
@@ -282,7 +283,7 @@ static void uacce_free_dma_buffers(struct uacce_queue *q)
 		dev_dbg(pdev, "free dma qfr (kaddr=%lx, dma=%llx)\n",
 			(unsigned long)qfr->dma_list[i].kaddr,
 			qfr->dma_list[i].dma);
-		dma_free_coherent(uacce->pdev, qfr->dma_list[i].size,
+		dma_free_coherent(pdev, qfr->dma_list[i].size,
 				  qfr->dma_list[i].kaddr,
 				  qfr->dma_list[i].dma);
 		i++;
@@ -440,7 +441,7 @@ static int uacce_fops_release(struct inode *inode, struct file *filep)
 
 static vm_fault_t uacce_vma_fault(struct vm_fault *vmf)
 {
-	if (vmf->flags & (FAULT_FLAGS_MKWRITE | FAULT_FALG_WRITE))
+	if (vmf->flags & (FAULT_FLAG_MKWRITE | FAULT_FLAG_WRITE))
 		return VM_FAULT_SIGBUS;
 
 	return 0;
@@ -456,7 +457,7 @@ static void uacce_vma_close(struct vm_area_struct *vma)
 	if (vma->vm_pgoff >= UACCE_MAX_REGION)
 		return;
 	
-	qfr = q->qfr[vma->vm_pgoff];
+	qfr = q->qfrs[vma->vm_pgoff];
 	if (!qfr) {
 		dev_err(dev, "qfr NULL, type %lu!\n", vma->vm_pgoff);
 		return;
@@ -528,7 +529,7 @@ static int uacce_sort_dma_buffers(struct uacce_dma_slice *list, int low,
 		if (pilot)
 			pr_err("fail to sort base!\n");
 		kfree(idx_list);
-		return;
+		return pilot;
 	}
 
 	if (pilot > low + 1) {
@@ -564,10 +565,10 @@ static int uacce_alloc_dma_buffers(struct uacce_queue *q,
 	unsigned long size = vma->vm_end - vma->vm_start;
 	unsigned long max_size = PAGE_SIZE << (MAX_ORDER - 1);
 	struct device *pdev = q->uacce->parent;
-	struct uacce_device *uacce = q->uacce
+	struct uacce_device *uacce = q->uacce;
 	unsigned long start = vma->vm_start;
 	struct uacce_dma_slice *slice;
-	unsigned long ss_sum;
+	unsigned long ss_num;
 	int ret, i;
 
 	/*
@@ -596,8 +597,8 @@ static int uacce_alloc_dma_buffers(struct uacce_queue *q,
 						    PAGE_SIZE - 1) & PAGE_MASK,
 						    &slice[i].dma, GFP_KERNEL);
 		if (!slice[i].kaddr) {
-			dev_err(pdev, "alloc dma slice(sz=%ld,dma=0x%llx) fail!\n",
-			size, size[i].dma);
+			dev_err(pdev, "Get dma slice(sz=%lu,dma=0x%llx) fail!\n",
+			size, slice[i].dma);
 			slice[0].total_num = i;
 			uacce_free_dma_buffers(q);
 			return -ENOMEM;
@@ -640,7 +641,7 @@ static int uacce_mmap_dma_buffers(struct uacce_queue *q,
 					slice[i].dma,
 					slice[i].size);
 		if (ret) {
-			dev_err(pdev, "mmap dma buf fail(dma=0x%llx,size=0x%llx)!\n",
+			dev_err(pdev, "dma mmap fail(dma=0x%llx,size=0x%llx)!\n",
 				slice[i].dma, slice[i].size);
 			goto DMA_MMAP_FAIL;
 		}
@@ -713,7 +714,7 @@ static int uacce_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 	if (q->state != UACCE_Q_INIT && q->state != UACCE_Q_STARTED)
 		goto out_with_lock;
 	
-	q->qfr[type] = qfr;
+	q->qfrs[type] = qfr;
 
 	switch (type) {
 	case UACCE_QFRT_MMIO:
@@ -737,14 +738,14 @@ static int uacce_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 		goto out_with_lock;
 	}
 
-	mutex_lock(&uacce_mutex);
+	mutex_unlock(&uacce_mutex);
 
 	return ret;
 
 out_with_lock:
-	mutex_lock(&uacce_mutex);
+	mutex_unlock(&uacce_mutex);
 	kfree(qfr);
-	q->qfrs[type] = NULL
+	q->qfrs[type] = NULL;
 	return ret;
 }
 
@@ -755,7 +756,7 @@ static __poll_t uacce_fops_poll(struct file *file, poll_table *wait)
 
 	poll_wait(file, &q->wait, wait);
 	if (uacce->ops->is_q_updated && uacce->ops->is_q_updated(q))
-		ret = EPOLLIN | EPOLLRDNORM;
+		return EPOLLIN | EPOLLRDNORM;
 
 	return 0;
 }
@@ -772,7 +773,7 @@ static const struct file_operations uacce_fops = {
 	.poll		= uacce_fops_poll,
 };
 
-#define to_uacce_device(dev) container_of(dev, struct uacce_device, dev);
+#define to_uacce_device(dev) container_of(dev, struct uacce_device, dev)
 
 static ssize_t api_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
@@ -787,7 +788,7 @@ static ssize_t flags_show(struct device *dev,
 {
 	struct uacce_device *uacce = to_uacce_device(dev);
 
-	return sysfs_emit(buf, "%d\n", uacce->flags);
+	return sysfs_emit(buf, "%u\n", uacce->flags);
 }
 
 static ssize_t available_instances_show(struct device *dev,
@@ -808,7 +809,7 @@ static ssize_t algorithms_show(struct device *dev,
 {
 	struct uacce_device *uacce = to_uacce_device(dev);
 
-	return sysfs_emit(buf, "%s", uacce->algs);
+	return sysfs_emit(buf, "%s\n", uacce->algs);
 }
 
 static ssize_t region_mmio_size_show(struct device *dev,
@@ -904,7 +905,7 @@ static ssize_t numa_distance_show(struct device *dev,
 	distance = node_distance(uacce->parent->numa_node,
 		cpu_to_node(smp_processor_id()));
 #endif
-	return sysfs_emit(buf, "%d\n", abs(distance));
+	return sysfs_emit(buf, "%d\n", distance);
 }
 
 static DEVICE_ATTR_RO(api);
@@ -915,7 +916,7 @@ static DEVICE_ATTR_RO(algorithms);
 static DEVICE_ATTR_RO(region_mmio_size);
 static DEVICE_ATTR_RO(region_dus_size);
 static DEVICE_ATTR_RO(isolate);
-static DEVICE_ATTR_RO(isolate_strategy);
+static DEVICE_ATTR_RW(isolate_strategy);
 static DEVICE_ATTR_RO(dev_state);
 static DEVICE_ATTR_RO(numa_distance);
 
@@ -981,7 +982,7 @@ static unsigned int uacce_enable_sva(struct device *parent, unsigned int flags)
 	ret = iommu_dev_enable_feature(parent, IOMMU_DEV_FEAT_SVA);
 	if (ret) {
 		dev_err(parent, "failed to enable SVA feature! ret = %pe\n", ERR_PTR(ret));
-		iommu_dev_disable_feature(parent, IOMMU_DEV_FEAT_IOPF)
+		iommu_dev_disable_feature(parent, IOMMU_DEV_FEAT_IOPF);
 		return flags;
 	}
 
@@ -1033,7 +1034,7 @@ static void uacce_disable_sva(struct uacce_device *uacce)
 	device_initialize(&uacce->dev);
 	uacce->dev.devt = MKDEV(MAJOR(uacce_devt), uacce->dev_id);
 	uacce->dev.class = uacce_class;
-	uacce->dev.groups = uacce_dev_groups
+	uacce->dev.groups = uacce_dev_groups;
 	uacce->dev.parent = uacce->parent;
 	uacce->dev.release = uacce_release;
 	dev_set_name(&uacce->dev, "%s-%u", interface->name, uacce->dev_id);
@@ -1062,7 +1063,7 @@ int uacce_register(struct uacce_device *uacce)
 	if (!uacce)
 		return -ENODEV;
 	
-	uacce-cdev = cdev_alloc();
+	uacce->cdev = cdev_alloc();
 	if (!uacce->cdev)
 		return -ENOMEM;
 	
@@ -1077,7 +1078,7 @@ EXPORT_SYMBOL_GPL(uacce_register);
  * uacce_remove() - remove the accelerator
  * @uacce: the accelerator to remove=
  */
-void uacce_register(struct uacce_device *uacce)
+void uacce_remove(struct uacce_device *uacce)
 {
 	struct uacce_queue *q, *next_q;
 
