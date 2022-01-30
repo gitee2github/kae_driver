@@ -1065,7 +1065,7 @@ static irqreturn_t qm_aeq_thread(int irq, void *data)
 	struct device *dev = &qm->pdev->dev;
 	u32 type, qp_id;
 
-	whiler (((le32_to_cpu(aeqe->dw0) >> QM_EQE_AEQE_TYPE_SHIFT) & 0x1) ==
+	while (((le32_to_cpu(aeqe->dw0) >> QM_EQE_AEQE_TYPE_SHIFT) & 0x1) ==
 		qm->status.aeqc_phase) {
 		type = (le32_to_cpu(aeqe->dw0) >> QM_AEQE_TYPE_SHIFT) &
 			QM_AEQE_TYPE_MASK;
@@ -2349,26 +2349,26 @@ static void qm_hw_error_init_v1(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
 	writel(QM_ABNORMAL_INT_MASK_VALUE, qm->io_base + QM_ABNORMAL_INT_MASK);
 }
 
-static void qm_hw_error_init_v2(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
+static void qm_hw_error_cfg(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
 {
-	u32 irq_enable = ce | nfe | fe | msi;
-	u32 irq_unmask = ~irq_enable;
-
 	qm->error_mask = ce | nfe | fe;
-	qm->msi_mask = msi;
-
 	/* clear QM hw residual error source */
-	writel(QM_ABNORMAL_INT_SOURCE_CLR, qm->io_base +
-	       QM_ABNORMAL_INT_SOURCE);
+	writel(QM_ABNORMAL_INT_SOURCE_CLR,
+		   qm->io_base + QM_ABNORMAL_INT_SOURCE);
 
 	/* configure error type */
 	writel(ce, qm->io_base + QM_RAS_CE_ENABLE);
-	writel(0x1, qm->io_base + QM_RAS_CE_THRESHOLD);
+	writel(QM_RAS_CE_TIMES_PER_IRQ, qm->io_base + QM_RAS_CE_THRESHOLD);
 	writel(nfe, qm->io_base + QM_RAS_NFE_ENABLE);
 	writel(fe, qm->io_base + QM_RAS_FE_ENABLE);
+}
 
-	/* use RAS irq default, so only set QM_RAS_MSI_INT_SEL for MSI */
-	writel(msi, qm->io_base + QM_RAS_MSI_INT_SEL);
+static void qm_hw_error_init_v2(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
+{
+	u32 irq_enable = ce | nfe | fei;
+	u32 irq_unmask = ~irq_enable;
+
+	qm_hw_error_cfg(qm, ce, nfe, fe);
 
 	irq_unmask &= readl(qm->io_base + QM_ABNORMAL_INT_MASK);
 	writel(irq_unmask, qm->io_base + QM_ABNORMAL_INT_MASK);
@@ -2376,10 +2376,32 @@ static void qm_hw_error_init_v2(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
 
 static void qm_hw_error_uninit_v2(struct hisi_qm *qm)
 {
-	writel(QM_HW_ERROR_IRQ_DISABLE, qm->io_base + QM_ABNORMAL_INT_MASK);
+	writel(QM_ABNORMAL_INT_MASK_VALUE, qm->io_base + QM_ABNORMAL_INT_MASK);
 }
 
-static void qm_log_hw_error(struct hisi_qm *qm, u32 error_status)
+static void qm_hw_error_init_v3(struct hisi_qm *qm, u32 ce, u32 nfe, u32 fe)
+{
+	u32 irq_enable = ce | nfe | fei;
+	u32 irq_unmask = ~irq_enable;
+
+	qm_hw_error_cfg(qm, ce, nfe, fe);
+
+	/* enable close master ooo when hardware error happened */
+	writel(nfe & (~QM_DB_RANDOM_INVALID), qm->io_base + QM_OOO_SHUTDOWN_SEL);
+
+	irq_unmask &= readl(qm->io_base + QM_ABNORMAL_INT_MASK);
+	writel(irq_unmask, qm->io_base + QM_ABNORMAL_INT_MASK);
+}
+
+static void qm_hw_error_uninit_v3(struct hisi_qm *qm)
+{
+	writel(QM_ABNORMAL_INT_MASK_VALUE, qm->io_base + QM_ABNORMAL_INT_MASK);
+
+	/* disable close master ooo when hardware error happened */
+	writel(0x0, qm->io_base + QM_OOO_SHUTDOWN_SEL);
+}
+
+static void qm_log_hw_error(struct hisi_qm *qm, u32 error_status, bool *is_reset)
 {
 	const struct hisi_qm_hw_error *err;
 	struct device *dev = &qm->pdev->dev;
@@ -2392,53 +2414,277 @@ static void qm_log_hw_error(struct hisi_qm *qm, u32 error_status)
 			continue;
 
 		dev_err(dev, "%s [error status=0x%x] found\n",
-			 err->msg, err->int_msk);
+			err->msg, err->int_msk);
 
 		if (err->int_msk & QM_DB_TIMEOUT) {
-			reg_val = readl(qm->io_base +
-					QM_ABNORMAL_INF01);
+			reg_val = readl(qm->io_base + QM_ABNORMAL_INF01);
 			type = (reg_val & QM_DB_TIMEOUT_TYPE) >>
 			       QM_DB_TIMEOUT_TYPE_SHIFT;
 			vf_num = reg_val & QM_DB_TIMEOUT_VF;
 			dev_err(dev, "qm %s doorbell timeout in function %u\n",
-				 qm_db_timeout[type], vf_num);
+				qm_db_timeout[type], vf_num);
 		} else if (err->int_msk & QM_OF_FIFO_OF) {
-			reg_val = readl(qm->io_base +
-					QM_ABNORMAL_INF00);
+			reg_val = readl(qm->io_base + QM_ABNORMAL_INF00);
 			type = (reg_val & QM_FIFO_OVERFLOW_TYPE) >>
 			       QM_FIFO_OVERFLOW_TYPE_SHIFT;
 			vf_num = reg_val & QM_FIFO_OVERFLOW_VF;
 
 			if (type < ARRAY_SIZE(qm_fifo_overflow))
 				dev_err(dev, "qm %s fifo overflow in function %u\n",
-					 qm_fifo_overflow[type],
-					 vf_num);
+					qm_fifo_overflow[type], vf_num);
 			else
 				dev_err(dev, "unknown error type\n");
 		}
+
+		if (err->reset_level == GLOBAL_RESET)
+			*is_reset = true;
 	}
 }
 
-static pci_ers_result_t qm_hw_error_handle_v2(struct hisi_qm *qm)
+static enum acc_err_result qm_hw_error_handle_v2(struct hisi_qm *qm)
 {
 	u32 error_status, tmp;
+	bool is_reset = false;
 
 	/* read err sts */
 	tmp = readl(qm->io_base + QM_ABNORMAL_INT_STATUS);
 	error_status = qm->error_mask & tmp;
 
 	if (error_status) {
-		qm_log_hw_error(qm, error_status);
+		if (error_status & QM_ECC_MBIT)
+			qm->err_status.is_qm_ecc_mbit = true;
 
-		/* clear err sts */
-		writel(error_status, qm->io_base + QM_ABNORMAL_INT_SOURCE);
+		qm_log_hw_error(qm, error_status, &is_reset);
+		if (!is_reset) {
+			writel(error_status, qm->io_base +
+				   QM_ABNORMAL_INT_SOURCE);
+			writel(qm->err_info.nfe,
+				   qm->io_base + QM_RAS_NFE_ENABLE);
+			return ACC_ERR_RECOVERED;
+		}
 
-		return PCI_ERS_RESULT_NEED_RESET;
+		return ACC_ERR_NEED_RESET;
 	}
 
-	return PCI_ERS_RESULT_RECOVERED;
+	return ACC_ERR_RECOVERED;
 }
 
+static int qm_wait_mb_finish(struct hisi_qm *qm, struct qm_mailbox *mailbox)
+{
+	int ret = -EBUSY;
+	int cnt = 0;
+
+	while (ret == -EBUSY) {
+		ret = qm_mb_nolock(qm, mailbox, WAIT_MB_READY_TIMEOUT, false);
+		if (!ret || ret == -ETIMEDOUT)
+			break;
+
+		/* Device error, get/send message directly */
+		if (++cnt > MAX_WAIT_MB_FREE) {
+			ret = qm_mb_nolock(qm, mailbox, WAIT_MB_READY_TIMEOUT, true);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int qm_get_mb_cmd(struct hisi_qm *qm, u64 *msg, u16 fun_num)
+{
+	struct qm_mailbox mailbox;
+	int ret;
+
+	qm_mb_pre_init(&mailbox, QM_MB_CMD_DST, 0, fun_num, 0);
+	mutex_lock(&qm->mailbox_lock);
+	ret = qm_wait_mb_finish(qm, &mailbox);
+	*msg = readl(qm->io_base + QM_MB_CMD_DATA_ADDR_L) |
+		  ((u64)readl(qm->io_base + QM_MB_CMD_DATA_ADDR_H) << 32);
+
+	mutex_unlock(&qm->mailbox_lock);
+
+	return ret;
+}
+
+static void qm_clear_cmd_interrupt(struct hisi_qm *qm, u64 vf_mask)
+{
+	u32 val;
+
+	if (qm->fun_type == QM_HW_PF)
+		writeq(vf_mask, qm->io_base + QM_IFC_INT_SOURCE_P);
+
+	val = readl(qm->io_base + QM_IFC_INT_SOURCE_V);
+	val |= QM_IFC_INT_SOURCE_MASK;
+	writel(val, qm->io_base + QM_IFC_INT_SOURCE_V);
+}
+
+static void qm_handle_vf_msg(struct hisi_qm *qm, u32 vf_id)
+{
+	struct device *dev = &qm->pdev->dev;
+	u32 cmd;
+	u64 msg;
+	int ret;
+
+	ret = qm_get_mb_cmd(qm, &msg, vf_id);
+	if (ret) {
+		dev_err(dev, "failed to get msg from VF(%u)!\n", vf_id);
+		return;
+	}
+
+	cmd = msg & QM_MB_CMD_DATA_MASK;
+	switch (cmd) {
+	case QM_VF_PREPARE_FAIL:
+		dev_err(dev, "failed to stop VF(%u)!\n", vf_id);
+		break;
+	case QM_VF_START_FAIL:
+		dev_err(dev, "failed to start VF(%u)!\n", vf_id);
+		break;
+	case QM_VF_PREPARE_DONE:
+	case QM_VF_START_DONE:
+		break;
+	default:
+		dev_err(dev, "unsupported cmd %u sent by VF(%u)!\n", cmd, vf_id);
+		break;
+	}
+}
+
+static int qm_wait_vf_prepare_finish(struct hisi_qm *qm)
+{
+	struct device *dev = &qm->pdev->dev;
+	u32 vfs_num = qm->vfs_num;
+	int cnt = 0;
+	int ret = 0;
+	u64 val;
+	u32 i;
+
+	if (!qm->vfs_num || qm->ver < QM_HW_V3)
+		return 0;
+
+	while (true) {
+		val = readq(qm->io_base + QM_IFC_INT_SOURCE_P)
+		/* All VFs send command to PF, break */
+		if ((val & GENMASK(vfs_num, 1)) == GENMASK(vfs_num, 1))
+			break;
+
+		if (++cnt < QM_MAX_PF_WAIT_COUNT) {
+			ret = -EBUSY;
+			break;
+		}
+		
+		msleep(QM_WAIT_DST_ACK);
+	}
+		
+	/* PF check VFs msg */
+	for (i = 1; i <= vfs_num; i++) {
+		if (val & BIT(i))
+			qm_handle_vf_msg(qm, i);
+		else
+			dev_err(dev, "VF(%u) not ping PF!\n", i);
+	}
+
+	/* PF clear interrupt to ack VFs */
+	qm_clear_cmd_interrupt(qm, val);
+
+	return ret;
+}
+
+static void qm_trigger_vf_interrupt(struct hisi_qm *qm, u32 fun_num)
+{
+	u32 val;
+
+	val = readl(qm->io_base + QM_IFC_INT_CFG);
+	val &= ~QM_IFC_SEND_ALL_VFS;
+	val |= fun_num;
+	writel(val, qm->io_base + QM_IFC_INT_CFG);
+
+	val = readl(qm->io_base + QM_IFC_INT_SET_P);
+	val |= QM_IFC_INT_SET_MASK;
+	writel(val, qm->io_base + QM_IFC_INT_SET_P);
+}
+
+static void qm_trigger_pf_interrupt(struct hisi_qm *qm)
+{
+	u32 val;
+
+	val = readl(qm->io_base + QM_IFC_INT_SET_V);
+	val |= QM_IFC_INT_SET_MASK;
+	writel(val, qm->io_base + QM_IFC_INT_SET_V);
+}
+
+static int qm_ping_single_vf(struct hisi_qm *qm, u64 cmd, u32 fun_num)
+{
+	struct device *dev = &qm->pdev->dev;
+	struct qm_mailbox mailbox;
+	int cnt = 0;
+	u64 val;
+	int ret;
+
+	qm_mb_pre_init(&mailbox, QM_MB_CMD_SRC, cmd, fun_num, 0);
+	mutex_lock(&qm->mailbox_lock);
+	ret = qm_mb_nolock(*qm, &mailbox, WAIT_MB_READY_TIMEOUT, false);
+	if (ret) {
+		dev_err(dev, "failed to send command to vf(%u)!\n", fun_num);
+		goto err_unlock;
+	}
+
+	qm_trigger_vf_interrupt(qm, fun_num);
+	while (true) {
+		msleep(QM_WAIT_DST_ACK);
+		val = readq(qm->io_base + QM_IFC_READY_STATUS);
+		/* if VF respond, PF notifies VF successfully. */
+		if (!(val & BIT(fun_num)))
+			goto err_unlock;
+
+		if (++cnt > QM_MAX_PF_WAIT_COUNT) {
+			dev_err(dev, "failed to get response form VF(%u)!\n", fun_num);
+			ret = -ETIMEDOUT;
+			break;
+		}
+	}
+
+err_unlock:
+	mutex_unlock(&qm->mailbox_lock);
+	return ret;
+}
+
+static int qm_ping_all_vfs(struct hisi_qm *qm, u64 cmd)
+{
+	struct device *dev = &qm->pdev->dev;
+	u32 vfs_num = qm->vfs_num;
+	struct qm_mailbox mailbox;
+	u64 val = 0;
+	int cnt = 0;
+	u32 i;
+
+	qm_mb_pre_init(&mailbox, QM_MB_CMD_SRC, cmd, QM_MB_PING_ALL_VFS, 0);
+	mutex_lock(&qm->mailbox_lock);
+	/* PF sends command to all VFs by mailbox */
+	if (qm_wait_mb_finish(qm &mailbox))
+		dev_err(dev, "failed to send command to all vfs!\n");
+
+	qm_trigger_vf_interrupt(qm, QM_MB_PING_ALL_VFS);
+	while (true) {
+		msleep(QM_WAIT_DST_ACK);
+		val = readq(qm->io_base + QM_IFC_READY_STATUS);
+		/* if all VFs respond, PF notifies VF successfully. */
+		if (!(val & GENMASK(vfs_num, 1))) {
+			mutex_unlock(&qm->mailbox_lock);
+			return 0;
+		}
+
+		if (++cnt > QM_MAX_PF_WAIT_COUNT)
+			break;
+	}
+
+	mutex_unlock(&qm->mailbox_lock);
+
+	/* Check which vf respond timeout. */
+	for (i = 1; i <= vfs_num; i++) {
+		if (val & BIT(i))
+			dev_err(dev, "failed to get response from VF(%u)!\n", i);
+	}
+
+	return -ETIMEDOUT;
+}
 static const struct hisi_qm_hw_ops qm_hw_ops_v1 = {
 	.qm_db = qm_db_v1,
 	.get_irq_num = qm_get_irq_num_v1,
