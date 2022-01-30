@@ -254,7 +254,7 @@
 #define QM_QOS_TYPICAL_NUM		8
 #define QM_SHAPER_MIN_CBS_S		8
 #define QM_QOS_TICK			0x300U
-#define QM_QOS_DIVISOR_CLK		0X1f40U
+#define QM_QOS_DIVISOR_CLK		0x1f40U
 #define QM_QOS_MAX_CIR_B		200
 #define QM_QOS_MIN_CIR_B		100
 #define QM_QOS_MAX_CIR_U		6
@@ -431,7 +431,7 @@ struct hisi_qm_hw_ops {
 	enum acc_err_result (*hw_error_handle)(struct hisi_qm *qm);
 	int (*drain_qm)(struct hisi_qm *qm);
 	int (*stop_qp)(struct hisi_qp *qp);
-	int (*set_msi)(struct hisi_qm *qm);
+	int (*set_msi)(struct hisi_qm *qm, bool set);
 	int (*ping_all_vfs)(struct hisi_qm *qm, u64 cmd);
 	int (*ping_pf)(struct hisi_qm *qm, u64 cmd);
 };
@@ -1459,7 +1459,7 @@ static int current_qm_write(struct hisi_qm *qm, u32 val)
 	if (val > qm->vfs_num)
 		return -EINVAL;
 	
-	/* According PF or VF Dev ID to calculation curr_qm_qp_num and store */.
+	/* According PF or VF Dev ID to calculation curr_qm_qp_num and store */
 	if (!val)
 		qm->debug.curr_qm_qp_num = qm->qp_num;
 	else
@@ -1764,7 +1764,7 @@ int hisi_qm_diff_regs_init(struct hisi_qm *qm,
 }
 EXPORT_SYMBOL_GPL(hisi_qm_diff_regs_init);
 
-staic void dfx_regs_uninit(struct hisi_qm *qm,
+static void dfx_regs_uninit(struct hisi_qm *qm,
 		struct dfx_diff_registers *dregs, int reg_len)
 {
 	int i;
@@ -2213,7 +2213,7 @@ static int qm_dbg_help(struct hisi_qm *qm, char *s)
 		return -EINVAL;
 	}
 
-	dev_info(dev, "available commands\n");
+	dev_info(dev, "available commands:\n");
 	dev_info(dev, "sqc <num>\n");
 	dev_info(dev, "cqc <num>\n");
 	dev_info(dev, "eqc\n");

@@ -167,7 +167,7 @@ out:
 	return 0;
 }
 
-static long uacce_cmd_shared_qfr(struct uacce_queue *src, int fd)
+static long uacce_cmd_share_qfr(struct uacce_queue *src, int fd)
 {
 	struct device *dev = &src->uacce->dev;
 	struct file *filep = fget(fd);
