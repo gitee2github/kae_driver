@@ -5,22 +5,66 @@
 #define __HISI_HPRE_H
 
 #include <linux/list.h>
-#include "../qm.h"
+#include "../hisi_acc_am.h"
 
 #define HPRE_SQE_SIZE			sizeof(struct hpre_sqe)
-#define HPRE_SQ_SIZE			(HPRE_SQE_SIZE * QM_Q_DEPTH)
-#define QM_CQ_SIZE			(QM_CQE_SIZE * QM_Q_DEPTH)
 #define HPRE_PF_DEF_Q_NUM		64
 #define HPRE_PF_DEF_Q_BASE		0
-#define HPRE_RESET			0
-#define HPRE_WAIT_DELAY	1000
 
-struct hpre_ctrl;
+#define HPRE_V2_ALG_TYPE		0
+#define HPRE_V3_ECC_ALG_TYPE	1
+
+enum {
+	HPRE_CLUSTER0,
+	HPRE_CLUSTER1,
+	HPRE_CLUSTER2,
+	HPRE_CLUSTER3
+};
+
+enum hpre_ctrl_dbgfs_file {
+	HPRE_CLEAR_ENABLE,
+	HPRE_CLUSTER_CTRL,
+	HPRE_DEBUG_FILE_NUM
+};
+
+enum hpre_dfx_dbgfs_file {
+	HPRE_SEND_CNT,
+	HPRE_RECV_CNT,
+	HPRE_SEND_FAIL_CNT,
+	HPRE_SEND_BUSY_CNT,
+	HPRE_OVER_THRHLD_CNT,
+	HPRE_OVERTIME_THRHLD,
+	HPRE_INVALID_REQ_CNT,
+	HPRE_DFX_FILE_NUM
+};
+
+#define HPRE_CLUSTERS_NUM_V2		(HPRE_CLUSTER3 + 1)
+#define HPRE_CLUSTERS_NUM_V3		1
+#define HPRE_CLUSTERS_NUM_MAX		HPRE_CLUSTERS_NUM_V2
+#define HPRE_DEBUGFS_FILE_NUM		(HPRE_DEBUG_FILE_NUM + HPRE_CLUSTERS_NUM_MAX - 1)
+
+struct hpre_debugfs_file {
+	int index;
+	enum hpre_ctrl_dbgfs_file type;
+	spinlock_t lock;
+	struct hpre_debug *debug;
+};
+
+struct hpre_dfx {
+	const char *name;
+	struct hisi_qm *qm;
+	atomic64_t value;
+	enum hpre_dfx_dbgfs_file type;
+};
+
+struct hpre_debug {
+	struct hpre_dfx dfx[HPRE_DFX_FILE_NUM];
+	struct hpre_debugfs_file files[HPRE_DEBUGFS_FILE_NUM];
+};
 
 struct hpre {
 	struct hisi_qm qm;
-	struct list_head list;
-	struct hpre_ctrl *ctrl;
+	struct hpre_debug debug;
 	unsigned long status;
 };
 
@@ -31,11 +75,8 @@ enum hpre_alg_type {
 	HPRE_ALG_KG_CRT = 0x3,
 	HPRE_ALG_DH_G2 = 0x4,
 	HPRE_ALG_DH = 0x5,
-	HPRE_ALG_PRIME = 0x6,
-	HPRE_ALG_MOD = 0x7,
-	HPRE_ALG_MOD_INV = 0x8,
-	HPRE_ALG_MUL = 0x9,
-	HPRE_ALG_COPRIME = 0xA
+	HPRE_ALG_ECC_MUL = 0xD,
+	HPRE_ALG_CURVE25519_MUL = 0x10
 };
 
 struct hpre_sqe {
@@ -49,12 +90,12 @@ struct hpre_sqe {
 	__le64 out;
 	__le16 tag;
 	__le16 resv2;
-#define _HPRE_SQE_ALIGN_EXT	7
-	__le32 rsvd1[_HPRE_SQE_ALIGN_EXT];
+#define HPRE_SQE_ALIGN_EXT	7
+	__le32 rsvd1[HPRE_SQE_ALIGN_EXT];
 };
 
-struct hpre *find_hpre_device(int node);
-int hpre_algs_register(void);
-void hpre_algs_unregister(void);
+struct hisi_qp *hpre_create_qp(u8 type);
+int hpre_algs_register(struct hisi_qm *qm);
+void hpre_algs_unregister(struct hisi_qm *qm);
 
 #endif
