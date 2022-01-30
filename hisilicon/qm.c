@@ -2686,6 +2686,72 @@ static int qm_ping_all_vfs(struct hisi_qm *qm, u64 cmd)
 
 	return -ETIMEDOUT;
 }
+
+static int qm_ping_pf(struct hisi_qm *qm, u64 cmd)
+{
+	struct qm_mailbox mailbox;
+	int cnt = 0;
+	u32 val;
+	int ret;
+
+	qm_mb_pre_init(&mailbox, QM_MB_CMD_SRC, cmd, 0, 0);
+	mutex_lock(&qm->mailbox_lock);
+	ret = qm_wait_mb_finish(qm, &mailbox);
+	if (ret) {
+		dev_err(&qm->pdev->dev, "failed to send command to PF!\n");
+		goto unlock;
+	}
+
+	qm_trigger_pf_interrupt(qm);
+	/* Waiting for PF response */
+	while (true) {
+		msleep(QM_WAIT_DST_ACK);
+		val = readl(qm->io_base + QM_IFC_INT_SET_V);
+		if (!(val & QM_IFC_INT_STATUS_MASK))
+			break;
+
+		if (++cnt > QM_MAX_VF_WAIT_COUNT) {
+			ret = -ETIMEDOUT;
+			break;
+		}
+	}
+
+unlock:
+	mutex_unlock(&qm->mailbox_lock);
+	return ret;
+}
+
+static int qm_drain_qm(struct hisi_qm *qm)
+{
+	return qm_mb(qm, QM_MB_CMD_FLUSH_QM, 0, 0, 0);
+}
+
+static int qm_stop_qp(struct hisi_qp *qp)
+{
+	return qm_mb(qp->qm, QM_MB_CMD_STOP_QP, 0, qp->qp_id, 0);
+}
+
+static int qm_set_msi(struct hisi_qm *qm, bool set)
+{
+	struct pci_dev *pdev = qm->pdev;
+
+	if (set) {
+		pci_write_config_dword(pdev, pdev->msi_cap + PCI_MSI_MASK_64),
+						0);
+	} else {
+		pci_write_config_dword(pdev, pdev->msi_cap + PCI_MSI_MASK_64),
+						ACC_PEH_MSI_DISABLE);
+		if (qm->err_status.is_qm_ecc_mbit ||
+			qm->err_status.is_dev_ecc_mbit)
+			return 0;
+
+		mdelay(1);
+		if (readl(qm->io_base + QM_PEH_DFX_INFO0))
+			return -EFAULT;
+	}
+
+	return 0;
+}
 static const struct hisi_qm_hw_ops qm_hw_ops_v1 = {
 	.qm_db = qm_db_v1,
 	.get_irq_num = qm_get_irq_num_v1,
