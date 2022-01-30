@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /* Copyright (c) 2019 HiSilicon Limited. */
 
-#ifndef __HISI_HPRE_H
-#define __HISI_HPRE_H
+#ifndef HISI_HPRE_H
+#define HISI_HPRE_H
 
 #include <linux/list.h>
-#include "../hisi_acc_am.h"
+#include "../hisi_acc_qm.h"
 
 #define HPRE_SQE_SIZE			sizeof(struct hpre_sqe)
 #define HPRE_PF_DEF_Q_NUM		64
@@ -24,7 +24,7 @@ enum {
 enum hpre_ctrl_dbgfs_file {
 	HPRE_CLEAR_ENABLE,
 	HPRE_CLUSTER_CTRL,
-	HPRE_DEBUG_FILE_NUM
+	HPRE_DEBUG_FILE_NUM,
 };
 
 enum hpre_dfx_dbgfs_file {
@@ -76,7 +76,7 @@ enum hpre_alg_type {
 	HPRE_ALG_DH_G2 = 0x4,
 	HPRE_ALG_DH = 0x5,
 	HPRE_ALG_ECC_MUL = 0xD,
-	HPRE_ALG_CURVE25519_MUL = 0x10
+	HPRE_ALG_CURVE25519_MUL = 0x10,
 };
 
 struct hpre_sqe {
