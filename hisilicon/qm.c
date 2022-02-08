@@ -3848,7 +3848,7 @@ static void qm_cmd_uninit(struct hisi_qm *qm)
 		return;
 
 	val = readl(qm->io_base + QM_IFC_INT_MASK);
-	val &= QM_IFC_INT_DISABLE;
+	val |= QM_IFC_INT_DISABLE;
 	writel(val, qm->io_base + QM_IFC_INT_MASK);
 }
 
