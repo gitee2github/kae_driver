@@ -90,13 +90,13 @@ struct sec_req {
 };
 
 struct sec_req_op {
-	int (*buf_map)(struct sec_ctx *ctx, struyct sec_req *req);
-	void (*buf_unmap)(struct sec_ctx *ctx, struyct sec_req *req);
-	void (*do_transfer)(struct sec_ctx *ctx, struyct sec_req *req);
-	int (*bf_fill)(struct sec_ctx *ctx, struyct sec_req *req);
-	int (*bd_send)(struct sec_ctx *ctx, struyct sec_req *req);
-	void (*callback)(struct sec_ctx *ctx, struyct sec_req *req, int err);
-	int (*process)(struct sec_ctx *ctx, struyct sec_req *req);
+	int (*buf_map)(struct sec_ctx *ctx, struct sec_req *req);
+	void (*buf_unmap)(struct sec_ctx *ctx, struct sec_req *req);
+	void (*do_transfer)(struct sec_ctx *ctx, struct sec_req *req);
+	int (*bf_fill)(struct sec_ctx *ctx, struct sec_req *req);
+	int (*bd_send)(struct sec_ctx *ctx, struct sec_req *req);
+	void (*callback)(struct sec_ctx *ctx, struct sec_req *req, int err);
+	int (*process)(struct sec_ctx *ctx, struct sec_req *req);
 }
 
 struct sec_auth_ctx {
@@ -115,7 +115,7 @@ struct sec_auth_ctx {
 	struct crypto_shash *hash_tfm;
 	struct crypto_shash *fallback_ahash_tfm;
 	struct shash_desc *desc;
-	struct crypto_shash *fallback_aead_tfm;
+	struct crypto_aead *fallback_aead_tfm;
 };
 
 struct sec_cipher_ctx {
@@ -216,7 +216,7 @@ struct sec_dev {
 };
 
 void sec_destroy_qps(struct hisi_qp **qps, int qp_num);
-struct hisi_sec **sec_create_qps(void);
+struct hisi_qp **sec_create_qps(void);
 int sec_register_to_crypto(struct hisi_qm *qm);
 void sec_unregister_from_crypto(struct hisi_qm *qm);
 #endif

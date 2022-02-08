@@ -9,7 +9,7 @@
 #define SEC_MAX_KEY_SIZE 64
 #define SEC_COMM_SCENE  0
 #define SEC_IPSEC_SCENE 1
-#define SEC_STREAM_SCENE    0X7
+#define SEC_STREAM_SCENE    0x7
 #define SEC_MAX_STREAMS 128
 #define SEC_SHA1_ALIGN_SZ   64
 #define SEC_MAX_SG_OF_REMAIN    8
@@ -18,9 +18,9 @@
 #define MERGE_SGL_NUM       2
 
 enum sec_calg {
-    SEC_CALG_3DES = 0x1;
-    SEC_CALG_AES  = 0x2;
-    SEC_CALG_SM4  = 0x3;
+    SEC_CALG_3DES = 0x1,
+    SEC_CALG_AES  = 0x2,
+    SEC_CALG_SM4  = 0x3,
 };
 
 enum sec_hash_alg {
@@ -97,6 +97,10 @@ enum {
     AUTHPAD_NOPAD,
 };
 
+enum {
+    AIGEN_GEN,
+    AIGEN_NOGEN,
+};
 
 struct sec_sqe_type2 {
 	__le32 mac_key_alg;
@@ -104,7 +108,7 @@ struct sec_sqe_type2 {
     __u8 c_alg;
     __u8 rsvd4;
     __le32 alen_ivllen;
-    __le32 clen_ivllen;
+    __le32 clen_ivhlen;
     __le16 auth_src_offset;
     __le16 cipher_src_offset;
     __le16 cs_ip_header_offset;
@@ -217,7 +221,7 @@ struct sec_sqe3 {
     __le16 auth_src_offset;
     __le16 cipher_src_offset;
     __le32 a_len_key;
-    __le32 clen_ivin;
+    __le32 c_len_ivin;
     __le64 data_dst_addr;
     __le64 mac_addr;
     union {
