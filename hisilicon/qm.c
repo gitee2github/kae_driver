@@ -3864,7 +3864,7 @@ static void qm_cmd_init(struct hisi_qm *qm)
 
 	/* Enable pf to vf communication reg. */
 	val = readl(qm->io_base + QM_IFC_INT_MASK);
-	val |= ~QM_IFC_INT_DISABLE;
+	val &= ~QM_IFC_INT_DISABLE;
 	writel(val, qm->io_base + QM_IFC_INT_MASK);
 }
 
@@ -4437,7 +4437,7 @@ static void free_list(struct list_head *head)
 	}
 }
 
-static int hisi_qm_sort_devices(int node, struct list_head *head
+static int hisi_qm_sort_devices(int node, struct list_head *head,
 				struct hisi_qm_list *qm_list)
 {
 	struct hisi_qm_resource *res, *tmp;
@@ -4969,7 +4969,7 @@ void hisi_qm_debug_regs_clear(struct hisi_qm *qm)
 
 	regs = qm_dfx_regs;
 	for (i = 0; i < CNT_CYC_REGS_NUM; i++) {
-		readl(qm->io_base + regs->regs->offset);
+		readl(qm->io_base + regs->offset);
 		regs++;
 	}
 
@@ -5239,7 +5239,7 @@ static int qm_set_vf_mse(struct hisi_qm *qm, bool set)
 
 	for (i = 0; i < MAX_WAIT_COUNTS; i++) {
 		pci_read_config_word(pdev, pos + PCI_SRIOV_CTRL, &sriov_ctrl);
-		if (set == ((sriov_ctrl & PCI_SRIOV_CTRL_MSE) >>
+		if (set == (sriov_ctrl & PCI_SRIOV_CTRL_MSE) >>
 			ACC_PEH_SRIOV_CTRL_VF_MSE_SHIFT)
 			return 0;
 
