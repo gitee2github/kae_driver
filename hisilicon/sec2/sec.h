@@ -93,8 +93,8 @@ struct sec_req_op {
 	int (*buf_map)(struct sec_ctx *ctx, struct sec_req *req);
 	void (*buf_unmap)(struct sec_ctx *ctx, struct sec_req *req);
 	void (*do_transfer)(struct sec_ctx *ctx, struct sec_req *req);
-	int (*bf_fill)(struct sec_ctx *ctx, struct sec_req *req);
-	int (*bf_send)(struct sec_ctx *ctx, struct sec_req *req);
+	int (*bd_fill)(struct sec_ctx *ctx, struct sec_req *req);
+	int (*bd_send)(struct sec_ctx *ctx, struct sec_req *req);
 	void (*callback)(struct sec_ctx *ctx, struct sec_req *req, int err);
 	int (*process)(struct sec_ctx *ctx, struct sec_req *req);
 };
