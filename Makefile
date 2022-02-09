@@ -39,13 +39,10 @@ install:
 	-modprobe hisi_sec2 uacce_mode=2 enable_sm4_ctr=1 pf_q_num=256
 	-modprobe hisi_hpre uacce_mode=2 pf_q_num=256
 	-modprobe hisi_zip  uacce_mode=2 pf_q_num=256
-	-modprobe hisi_rde  uacce_mode=2 pf_q_num=256
 	-echo "options hisi_sec2 uacce_mode=2 enable_sm4_ctr=1 pf_q_num=256" > /etc/modprobe.d/hisi_sec2.conf
 	-echo "options hisi_hpre uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_hpre.conf
-	-echo "options hisi_rde  uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_rde.conf
 	-echo "options hisi_zip  uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_zip.conf
 uninstall:
-	modprobe -r hisi_rde
 	modprobe -r hisi_zip
 	modprobe -r hisi_hpre
 	modprobe -r hisi_sec2
@@ -56,10 +53,8 @@ uninstall:
 	rm -rf /lib/modules/`uname -r`/extra/hisi_sec2.ko
 	rm -rf /lib/modules/`uname -r`/extra/hisi_hpre.ko
 	rm -rf /lib/modules/`uname -r`/extra/hisi_zip.ko
-	rm -rf /lib/modules/`uname -r`/extra/hisi_rde.ko
 	rm -rf /etc/modprobe.d/hisi_sec2.conf
 	rm -rf /etc/modprobe.d/hisi_hpre.conf
-	rm -rf /etc/modprobe.d/hisi_rde.conf
 	rm -rf /etc/modprobe.d/hisi_zip.conf
 	depmod -a
 
