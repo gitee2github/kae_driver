@@ -386,10 +386,10 @@ static void sec_set_endian(struct hisi_qm *qm)
 	reg = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
 	reg &= ~(BIT(1) | BIT(0));
 	if (!IS_ENABLED(CONFIG_64BIT))
-		ret |= BIT(1);
+		reg |= BIT(1);
 
 	if (!IS_ENABLED(CONFIG_CPU_LITTLE_ENDIAN))
-		ret |= BIT(0);
+		reg |= BIT(0);
 
 	writel_relaxed(reg, qm->io_base + SEC_CONTROL_REG);
 }
@@ -405,7 +405,7 @@ static void sec_engine_sva_config(struct hisi_qm *qm)
 		writel_relaxed(reg, qm->io_base +
 				SEC_INTERFACE_USER_CTRL0_REG_V3);
 				
-		ret = readl_relaxed(qm->io_base +
+		reg = readl_relaxed(qm->io_base +
 				SEC_INTERFACE_USER_CTRL1_REG_V3);
 		reg &= SEC_USER1_SMMU_MASK_V3;
 		reg |= SEC_USER1_SMMU_NORMAL_V3;
@@ -483,12 +483,12 @@ static void sec_enable_clock_gate(struct hisi_qm *qm)
 	val |= SEC_DYNAMIC_GATE_EN;
 	writel(val, qm->io_base + SEC_DYNAMIC_GATE_REG);
 
-	ret = readl(qm->io_base + SEC_CORE_AUTO_GATE);
+	val = readl(qm->io_base + SEC_CORE_AUTO_GATE);
 	val |= SEC_CORE_AUTO_GATE_EN;
 	writel(val, qm->io_base + SEC_CORE_AUTO_GATE);
 }
 
-static sec_disable_clock_gate(struct hisi_qm *qm)
+static void sec_disable_clock_gate(struct hisi_qm *qm)
 {
 	u32 val;
 
@@ -506,9 +506,9 @@ static int sec_engine_init(struct hisi_qm *qm)
 	/* disable clock gate control before mem init */
 	sec_disable_clock_gate(qm);
 
-	writel_relaxed(0x1, qm->io_base + SEC_MEM_INIT_DONE_REG);
+	writel_relaxed(0x1, qm->io_base + SEC_MEM_START_INIT_REG);
 
-	ret = readl_relaxed_poll_timeout(qm->io_base + SEC_MEM_START_INIT_REG,
+	ret = readl_relaxed_poll_timeout(qm->io_base + SEC_MEM_INIT_DONE_REG,
 					 reg, reg & 0x1, SEC_DELAY_10_US,
 					 SEC_POLL_TIMEOUT_US);
 	if (ret) {
@@ -951,7 +951,7 @@ static void sec_log_hw_error(struct hisi_qm *qm, u32 err_sts, bool *is_reset)
 			dev_err(dev, "%s [error status=0x%x] found\n",
 				 errs->msg, errs->int_msk);
 
-			if (SEC_CORE_INT_STATUS_M_ECC & err->int_msk) {
+			if (SEC_CORE_INT_STATUS_M_ECC & errs->int_msk) {
 				err_val = readl(qm->io_base +
 						SEC_CORE_SRAM_ECC_ERR_INFO);
 				dev_err(dev, "multi ecc sram num=0x%x\n",
