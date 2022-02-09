@@ -58,7 +58,7 @@
 #define QM_MB_CMD_SEND_BASE		0x300
 #define QM_MB_EVENT_SHIFT				8
 #define QM_MB_BUSY_SHIFT		13
-#define QM_MB_QP_SHIFT			14
+#define QM_MB_OP_SHIFT			14
 #define QM_MB_CMD_DATA_ADDR_L		0x304
 #define QM_MB_CMD_DATA_ADDR_H		0x308
 #define QM_MB_MAX_WAIT_CNT		6000
@@ -121,8 +121,8 @@
 #define QM_Q_DEPTH			1024
 #define QM_MIN_QNUM						2
 #define HISI_ACC_SGL_SGE_NR_MAX		255
-#define QM_SHARPER_CFG			0x100164
-#define QM_SHARPER_ENABLE		BIT(30)
+#define QM_SHAPER_CFG			0x100164
+#define QM_SHAPER_ENABLE		BIT(30)
 #define QM_SHARPER_TYPE1_OFFSET		10
 #define QM_VF_STATE			0x0060
 #define MAX_DFX_FILES_NUM		64
@@ -149,7 +149,7 @@ enum qm_stop_reason {
 };
 
 enum qm_state {
-	QM_WORK = 0
+	QM_WORK = 0,
 	QM_STOP,
 };
 
@@ -191,7 +191,7 @@ struct dfx_diff_registers {
 struct dfx_info {
 	struct hisi_qm *qm;
 	const char * name;
-	void *date;
+	void *data;
 };
 
 struct qm_dfx {
@@ -200,7 +200,7 @@ struct qm_dfx {
 	atomic64_t abnormal_irq_cnt;
 	atomic64_t create_qp_err_cnt;
 	atomic64_t mb_err_cnt;
-}
+};
 
 struct debugfs_file {
 	enum qm_debug_file index;
@@ -267,7 +267,7 @@ struct hisi_qm_err_ini {
 	void (*hw_err_enable)(struct hisi_qm *qm);
 	void (*hw_err_disable)(struct hisi_qm *qm);
 	u32 (*get_dev_hw_err_status)(struct hisi_qm *qm);
-	void (*gclear_dev_hw_err_status)(struct hisi_qm *qm, u32 err_sts);
+	void (*clear_dev_hw_err_status)(struct hisi_qm *qm, u32 err_sts);
 	void (*open_axi_master_ooo)(struct hisi_qm *qm);
 	void (*close_axi_master_ooo)(struct hisi_qm *qm);
 	void (*open_sva_prefetch)(struct hisi_qm *qm);
@@ -283,7 +283,7 @@ struct hisi_qm_list {
 	int (*register_to_crypto)(struct hisi_qm *qm);
 	void (*unregister_from_crypto)(struct hisi_qm *qm);
 	atomic_t alg_refcnt;
-}
+};
 
 struct hisi_qm {
 	enum qm_hw_ver ver;
@@ -475,7 +475,7 @@ static inline void hisi_qm_add_list(struct hisi_qm *qm, struct hisi_qm_list *qm_
 static inline void hisi_qm_del_list(struct hisi_qm *qm, struct hisi_qm_list *qm_list)
 {
 	mutex_lock(&qm_list->lock);
-	list_del(&qm->list, &qm_list->list);
+	list_del(&qm->list);
 	mutex_unlock(&qm_list->lock);
 }
 
@@ -487,7 +487,7 @@ int hisi_qm_stop(struct hisi_qm *qm, enum qm_stop_reason r);
 int hisi_qm_start_qp(struct hisi_qp *qp, unsigned long arg);
 void hisi_qm_stop_qp(struct hisi_qp *qp);
 int hisi_qp_send(struct hisi_qp *qp, const void *msg);
-void hisi_qm_debug_init(struct hisi_qp *qp);
+void hisi_qm_debug_init(struct hisi_qm *qm);
 void hisi_qm_debug_regs_clear(struct hisi_qm *qm);
 int hisi_qm_sriov_enable(struct pci_dev *pdev, int max_vfs);
 int hisi_qm_sriov_disable(struct pci_dev *pdev, bool is_frozen);
