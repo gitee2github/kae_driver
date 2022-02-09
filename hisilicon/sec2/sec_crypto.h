@@ -12,6 +12,7 @@
 #define SEC_STREAM_SCENE    0x7
 #define SEC_MAX_STREAMS 128
 #define SEC_SHA1_ALIGN_SZ   64
+#define SEC_SHA512_ALIGN_SZ 128
 #define SEC_MAX_SG_OF_REMAIN    8
 #define PINGPONG_BUF_NUM    2
 #define SEC_MIN_BLOCK_SZ    1
