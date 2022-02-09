@@ -26,13 +26,13 @@
 #define SEC_BD_ERR_CHK_EN3		0xffffbfff
 
 #define SEC_SQE_SIZE			128
-#define SEC_SQ_SIZE			(HSEC_SQE_SIZE * QM_Q_DEPTH)
+#define SEC_SQ_SIZE			(SEC_SQE_SIZE * QM_Q_DEPTH)
 #define SEC_PF_DEF_Q_NUM		256
 #define SEC_PF_DEF_Q_BASE		0
 #define SEC_CTX_Q_NUM_DEF		2
 #define SEC_CTX_Q_NUM_MAX		32
 #define SEC_MASTER_GLOBAL_CTRL		0x300000
-#define SEC_MASTER_GLOBAL_CTRL_SHUTDWN	0x1
+#define SEC_MASTER_GLOBAL_CTRL_SHTDWN	0x1
 #define SEC_MASTER_TRANS_RETURN	0x300150
 #define SEC_MASTER_TRANS_RETURN_RW	0x3
 
@@ -72,14 +72,14 @@
 
 #define SEC_TRNG_EN_SHIFT		8
 #define SEC_AXI_SHUTDOWN_ENABLE		BIT(12)
-#define SEC_AXI_SHUTDOWN_DISABLE		0XFFFFEFFF
+#define SEC_AXI_SHUTDOWN_DISABLE		0xFFFFEFFF
 
 #define SEC_INTERFACE_USER_CTRL0_REG	0x301220
 #define SEC_INTERFACE_USER_CTRL1_REG	0x301224
 #define SEC_SAA_EN_REG			0x301270
-#define SEC_BD_ERR_CHK_EN_REG0	0X301380
-#define SEC_BD_ERR_CHK_EN_REG1	0X301384
-#define SEC_BD_ERR_CHK_EN_REG2	0X30138c
+#define SEC_BD_ERR_CHK_EN_REG0	0x301380
+#define SEC_BD_ERR_CHK_EN_REG1	0x301384
+#define SEC_BD_ERR_CHK_EN_REG3	0x30138c
 
 #define SEC_USER0_SMMU_NORMAL		(BIT(23) | BIT(15))
 #define SEC_USER1_SMMU_NORMAL		(BIT(31) | BIT(23) | BIT(15) | BIT(7))
@@ -91,12 +91,12 @@
 					SEC_USER1_ENABLE_DATA_SSV | \
 					SEC_USER1_WB_CONTEXT_SSV |  \
 					SEC_USER1_WB_DATA_SSV)
-#define SEC_USER0_SMMU_SVA		(SEC_USER1_SMMU_NORMAL | SEC_USER1_SVA_SET)
-#define SEC_USER0_SMMU_MASK		(~SEC_USER1_SVA_SET)
+#define SEC_USER1_SMMU_SVA		(SEC_USER1_SMMU_NORMAL | SEC_USER1_SVA_SET)
+#define SEC_USER1_SMMU_MASK		(~SEC_USER1_SVA_SET)
 #define SEC_INTERFACE_USER_CTRL0_REG_V3	0x302220
 #define SEC_INTERFACE_USER_CTRL1_REG_V3	0x302224
 #define SEC_USER1_SMMU_NORMAL_V3		(BIT(23) | BIT(17) | BIT(11) | BIT(5))
-#define SEC_USER1_SMMU_MASK_V3		0XFF79E79E
+#define SEC_USER1_SMMU_MASK_V3		0xFF79E79E
 #define SEC_CORE_INT_STATUS_M_ECC	BIT(2)
 
 #define SEC_PREFETCH_CFG		0x301130
@@ -221,16 +221,16 @@ static const char * const sec_dbg_file_name[] = {
 };
 
 static struct sec_dfx_item sec_dfx_labels[] = {
-	{"send_cnt", offsetof(struct sec_dfx, send_cnt)}.
-	{"recv_cnt", offsetof(struct sec_dfx, recv_cnt)}.
-	{"send_busy_cnt", offsetof(struct sec_dfx, send_busy_cnt)}.
-	{"recv_busy_cnt", offsetof(struct sec_dfx, recv_busy_cnt)}.
-	{"err_bd_cnt", offsetof(struct sec_dfx, err_bd_cnt)}.
-	{"invalid_req_cnt", offsetof(struct sec_dfx, invalid_req_cnt)}.
-	{"done_flag_cnt", offsetof(struct sec_dfx, done_flag_cnt)}.
+	{"send_cnt", offsetof(struct sec_dfx, send_cnt)},
+	{"recv_cnt", offsetof(struct sec_dfx, recv_cnt)},
+	{"send_busy_cnt", offsetof(struct sec_dfx, send_busy_cnt)},
+	{"recv_busy_cnt", offsetof(struct sec_dfx, recv_busy_cnt)},
+	{"err_bd_cnt", offsetof(struct sec_dfx, err_bd_cnt)},
+	{"invalid_req_cnt", offsetof(struct sec_dfx, invalid_req_cnt)},
+	{"done_flag_cnt", offsetof(struct sec_dfx, done_flag_cnt)},
 };
 
-static struct debugfs_reg32 hsec_dfx_regs[] = {
+static const struct debugfs_reg32 sec_dfx_regs[] = {
 	{"SEC_PF_ABNORMAL_INT_SOURCE    ",  0x301010},
 	{"SEC_SAA_EN                    ",  0x301270},
 	{"SEC_BD_LATENCY_MIN            ",  0x301600},
@@ -252,11 +252,11 @@ static struct debugfs_reg32 hsec_dfx_regs[] = {
 	{"SEC_BD_SAA6                   ",  0x301C38},
 	{"SEC_BD_SAA7                   ",  0x301C3C},
 	{"SEC_BD_SAA8                   ",  0x301C40},
-	{"SEC_RAS_CE_ENABLE             ",  0x301C40},
-	{"SEC_RAS_FE_ENABLE             ",  0x301C40},
-	{"SEC_RAS_NFE_ENABLE            ",  0x301C40},
-	{"SEC_REQ_TRNG_TIME_TH          ",  0x301C40},
-	{"SEC_CHANNEL_RNG_REQ_THLD      ",  0x301C40},
+	{"SEC_RAS_CE_ENABLE             ",  0x301050},
+	{"SEC_RAS_FE_ENABLE             ",  0x301054},
+	{"SEC_RAS_NFE_ENABLE            ",  0x301058},
+	{"SEC_REQ_TRNG_TIME_TH          ",  0x30112C},
+	{"SEC_CHANNEL_RNG_REQ_THLD      ",  0x302110},
 };
 
 /* define the SEC's dfx regs region and region length */
@@ -289,7 +289,7 @@ DEFINE_SHOW_ATTRIBUTE(sec_diff_regs);
 
 static int sec_pf_q_num_set(const char *val, const struct kernel_param *kp)
 {
-	return q_num_set(val, kp, SEC_PF_PCI_DEVICE_ID)
+	return q_num_set(val, kp, SEC_PF_PCI_DEVICE_ID);
 }
 
 static const struct kernel_param_ops sec_pf_q_num_ops = {
@@ -314,7 +314,7 @@ static int sec_ctx_q_num_set(const char *val, const struct kernel_param *kp)
 		return -EINVAL;
 
 	if (!ctx_q_num || ctx_q_num > SEC_CTX_Q_NUM_MAX || ctx_q_num & 0x1) {
-		pr_err("ctx queue num[%u] is invalid\n", ctx_q_num);
+		pr_err("ctx queue num[%u] is invalid!\n", ctx_q_num);
 		return -EINVAL;
 	}
 
@@ -338,7 +338,7 @@ static u32 vfs_num;
 module_param_cb(vfs_num, &vfs_num_ops, &vfs_num, 0444);
 MODULE_PARM_DESC(vfs_num, "Number of VFs to enable(1-63), 0(default)");
 
-void sec_destroy_qps(struct hisi_qp **qp, int qp_num)
+void sec_destroy_qps(struct hisi_qp **qps, int qp_num)
 {
 	hisi_qm_free_qps(qps, qp_num);
 	kfree(qps);
@@ -383,10 +383,10 @@ static void sec_set_endian(struct hisi_qm *qm)
 {
 	u32 reg;
 
-	reg = readl_relaxed(hisi_qm->io_base + SEC_CONTROL_REG);
+	reg = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
 	reg &= ~(BIT(1) | BIT(0));
 	if (!IS_ENABLED(CONFIG_64BIT))
-		reg |= BIT(1);
+		ret |= BIT(1);
 
 	if (!IS_ENABLED(CONFIG_CPU_LITTLE_ENDIAN))
 		ret |= BIT(0);
@@ -399,7 +399,7 @@ static void sec_engine_sva_config(struct hisi_qm *qm)
 	u32 reg;
 
 	if (qm->ver > QM_HW_V2) {
-		ret = readl_relaxed(qm->io_base +
+		reg = readl_relaxed(qm->io_base +
 				SEC_INTERFACE_USER_CTRL0_REG_V3);
 		reg |= SEC_USER0_SMMU_NORMAL;
 		writel_relaxed(reg, qm->io_base +
@@ -407,17 +407,17 @@ static void sec_engine_sva_config(struct hisi_qm *qm)
 				
 		ret = readl_relaxed(qm->io_base +
 				SEC_INTERFACE_USER_CTRL1_REG_V3);
-		reg &= SEC_USER1_SMMU_NORMAL;
-		reg |= SEC_USER1_SMMU_NORMAL;
+		reg &= SEC_USER1_SMMU_MASK_V3;
+		reg |= SEC_USER1_SMMU_NORMAL_V3;
 		writel_relaxed(reg, qm->io_base +
 				SEC_INTERFACE_USER_CTRL1_REG_V3);
 	} else {
-		ret = readl_relaxed(qm->io_base +
+		reg = readl_relaxed(qm->io_base +
 				SEC_INTERFACE_USER_CTRL0_REG);
 		reg |= SEC_USER0_SMMU_NORMAL;
 		writel_relaxed(reg, qm->io_base +
 				SEC_INTERFACE_USER_CTRL0_REG);
-		ret = readl_relaxed(qm->io_base +
+		reg = readl_relaxed(qm->io_base +
 				SEC_INTERFACE_USER_CTRL1_REG);
 		reg &= SEC_USER1_SMMU_MASK;
 		if (qm->use_sva)
@@ -429,7 +429,7 @@ static void sec_engine_sva_config(struct hisi_qm *qm)
 	}
 }
 
-static sec_open_sva_prefetch(struct hisi_qm *qm)
+static void sec_open_sva_prefetch(struct hisi_qm *qm)
 {
 	u32 val;
 	int ret;
@@ -438,9 +438,9 @@ static sec_open_sva_prefetch(struct hisi_qm *qm)
 		return;
 
 	/* Enable prefetch */
-	ret = readl_relaxed(qm->io_base + SEC_PREFETCH_CFG);
-	reg &= SEC_PREFETCH_ENABLE;
-	writel(reg, qm->io_base + SEC_PREFETCH_CFG);
+	val = readl_relaxed(qm->io_base + SEC_PREFETCH_CFG);
+	val &= SEC_PREFETCH_ENABLE;
+	writel(val, qm->io_base + SEC_PREFETCH_CFG);
 
 	ret = readl_relaxed_poll_timeout(qm->io_base + SEC_PREFETCH_CFG,
 						val, !(val & SEC_PREFETCH_DISABLE),
@@ -457,9 +457,9 @@ static void sec_close_sva_prefetch(struct hisi_qm *qm)
 	if (qm->ver < QM_HW_V3)
 		return;
 
-	ret = readl_relaxed(qm->io_base + SEC_PREFETCH_CFG);
-	reg |= SEC_PREFETCH_DISABLE;
-	writel(reg, qm->io_base + SEC_PREFETCH_CFG);
+	val = readl_relaxed(qm->io_base + SEC_PREFETCH_CFG);
+	val |= SEC_PREFETCH_DISABLE;
+	writel(val, qm->io_base + SEC_PREFETCH_CFG);
 
 	ret = readl_relaxed_poll_timeout(qm->io_base + SEC_SVA_TRANS,
 						val, !(val & SEC_SVA_DISABLE_READY),
@@ -475,17 +475,17 @@ static void sec_enable_clock_gate(struct hisi_qm *qm)
 	if (qm->ver < QM_HW_V3)
 		return;
 
-	ret = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
-	reg |= SEC_CLK_GATE_ENABLE;
-	writel_relaxed(reg, qm->io_base +SEC_CONTROL_REG);
+	val = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
+	val |= SEC_CLK_GATE_ENABLE;
+	writel_relaxed(val, qm->io_base +SEC_CONTROL_REG);
 
-	ret = readl(qm->io_base + SEC_DYNAMIC_GATE_REG);
-	reg |= SEC_DYNAMIC_GATE_EN;
-	writel(reg, qm->io_base + SEC_DYNAMIC_GATE_REG);
+	val = readl(qm->io_base + SEC_DYNAMIC_GATE_REG);
+	val |= SEC_DYNAMIC_GATE_EN;
+	writel(val, qm->io_base + SEC_DYNAMIC_GATE_REG);
 
 	ret = readl(qm->io_base + SEC_CORE_AUTO_GATE);
-	reg |= SEC_CORE_AUTO_GATE_EN;
-	writel(reg, qm->io_base + SEC_CORE_AUTO_GATE);
+	val |= SEC_CORE_AUTO_GATE_EN;
+	writel(val, qm->io_base + SEC_CORE_AUTO_GATE);
 }
 
 static sec_disable_clock_gate(struct hisi_qm *qm)
@@ -493,9 +493,9 @@ static sec_disable_clock_gate(struct hisi_qm *qm)
 	u32 val;
 
 	/* Kunpeng 920 needs to close clock gating */
-	ret = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
-	reg &= SEC_CLK_GATE_DISABLE;
-	writel_relaxed(reg, qm->io_base +SEC_CONTROL_REG);
+	val = readl_relaxed(qm->io_base + SEC_CONTROL_REG);
+	val &= SEC_CLK_GATE_DISABLE;
+	writel_relaxed(val, qm->io_base +SEC_CONTROL_REG);
 }
 
 static int sec_engine_init(struct hisi_qm *qm)
@@ -506,7 +506,7 @@ static int sec_engine_init(struct hisi_qm *qm)
 	/* disable clock gate control before mem init */
 	sec_disable_clock_gate(qm);
 
-	writel_relaxed(0x1, qm->io_base + SEC_MEM_START_INIT_REG);
+	writel_relaxed(0x1, qm->io_base + SEC_MEM_INIT_DONE_REG);
 
 	ret = readl_relaxed_poll_timeout(qm->io_base + SEC_MEM_START_INIT_REG,
 					 reg, reg & 0x1, SEC_DELAY_10_US,
@@ -546,7 +546,7 @@ static int sec_engine_init(struct hisi_qm *qm)
 	return 0;
 }
 
-static void sec_set_user_domain_and_cache(struct hisi_qm *qm)
+static int sec_set_user_domain_and_cache(struct hisi_qm *qm)
 {
 	/* qm user domain */
 	writel(AXUSER_BASE, qm->io_base + QM_ARUSER_M_CFG_1);
@@ -610,7 +610,7 @@ static void sec_hw_error_enable(struct hisi_qm *qm)
 {
 	if (qm->ver == QM_HW_V1) {
 		writel(SEC_CORE_INT_DISABLE, qm->io_base + SEC_CORE_INT_MASK);
-		pci_err(qm->pdev, "V1 not support hw error handle\n");
+		pci_info(qm->pdev, "V1 not support hw error handle\n");
 		return;
 	}
 
@@ -634,10 +634,10 @@ static void sec_hw_error_disable(struct hisi_qm *qm)
 	/* disable SEC hw error interrupts */
 	writel(SEC_CORE_INT_DISABLE, qm->io_base + SEC_CORE_INT_MASK);
 
-	/* enable SEC block master OOO when nfe occurs on Kunpeng930 */
+	/* disable SEC block master OOO when nfe occurs on Kunpeng930 */
 	sec_master_ooo_ctrl(qm, false);
 
-	/* enable RAS int */
+	/* disable RAS int */
 	writel(SEC_RAS_DISABLE, qm->io_base + SEC_RAS_CE_REG);
 	writel(SEC_RAS_DISABLE, qm->io_base + SEC_RAS_FE_REG);
 	writel(SEC_RAS_DISABLE, qm->io_base + SEC_RAS_NFE_REG);
@@ -730,7 +730,7 @@ static ssize_t sec_debug_write(struct file *filp, const char __user *buf,
 
 	switch (file->index) {
 	case SEC_CLEAR_ENABLE:
-		ret = clear_enable_write(file, val);
+		ret = sec_clear_enable_write(qm, val);
 		if (ret)
 			goto err_input;
 		break;
@@ -747,7 +747,7 @@ static ssize_t sec_debug_write(struct file *filp, const char __user *buf,
 	return ret;
 }
 
-static const struct file_operations sec_debug_fops = {
+static const struct file_operations sec_dbg_fops = {
 	.owner = THIS_MODULE,
 	.open = simple_open,
 	.read = sec_debug_read,
@@ -795,7 +795,7 @@ static void sec_create_dfx_file(struct hisi_qm *qm,
 				struct dentry *dir, int index)
 {
 	struct sec_dev *sec = container_of(qm, struct sec_dev, qm);
-	struct dfx_info *info = qm->debug.info + index;
+	struct dfx_info *info = sec->debug.info + index;
 	struct sec_dfx *dfx = &sec->debug.dfx;
 
 	info->qm = qm;
@@ -815,7 +815,7 @@ static int sec_core_debug_init(struct hisi_qm *qm)
 	struct dentry *tmp_d;
 	int i;
 
-	tmp_d = debugfs_create_dir("sec_dfx", ctrl->debug_root);
+	tmp_d = debugfs_create_dir("sec_dfx", qm->debug.debug_root);
 
 	regset = devm_kzalloc(dev, sizeof(*regset), GFP_KERNEL);
 	if (!regset)
@@ -845,13 +845,13 @@ static int sec_debug_init(struct hisi_qm *qm)
 	if (qm->pdev->device == SEC_PF_PCI_DEVICE_ID) {
 		for (i = SEC_CLEAR_ENABLE; i < SEC_DEBUG_FILE_NUM; i++) {
 			spin_lock_init(&sec->debug.files[i].lock);
-			sec->debug.files[i].ctrl = ctrl;
 			sec->debug.files[i].index = i;
+			sec->debug.files[i].qm = qm;
 
 			debugfs_create_file(sec_dbg_file_name[i], 0600,
-						sec->debug.debug_root,
+						qm->debug.debug_root,
 						sec->debug.files + i,
-						&sec_debug_fops);
+						&sec_dbg_fops);
 		}
 	}
 
@@ -868,7 +868,7 @@ static int sec_debugfs_init(struct hisi_qm *qm)
 	qm->debug.sqe_mask_offset = SEC_SQE_MASK_OFFSET;
 	qm->debug.sqe_mask_len = SEC_SQE_MASK_LEN;
 
-	ret = hisi_qm_diff_regs_init(qm, sec, sec_diff_regs,
+	ret = hisi_qm_diff_regs_init(qm, sec_diff_regs,
 					ARRAY_SIZE(sec_diff_regs));
 	if (ret)
 		dev_warn(dev, "Failed to init SEC diff regs!\n");
@@ -894,7 +894,7 @@ static void sec_debugfs_exit(struct hisi_qm *qm)
 	debugfs_remove_recursive(qm->debug.debug_root);
 }
 
-static void sec_show_last_regs_init(struct hisi_qm *qm)
+static int sec_show_last_regs_init(struct hisi_qm *qm)
 {
 	struct qm_debug *debug = &qm->debug;
 	int i;
@@ -942,7 +942,7 @@ static void sec_show_last_dfx_regs(struct hisi_qm *qm)
 
 static void sec_log_hw_error(struct hisi_qm *qm, u32 err_sts, bool *is_reset)
 {
-	const struct sec_hw_error *errs = sec_hw_error;
+	const struct sec_hw_error *errs = sec_hw_errors;
 	struct device *dev = &qm->pdev->dev;
 	u32 err_val;
 
@@ -951,12 +951,12 @@ static void sec_log_hw_error(struct hisi_qm *qm, u32 err_sts, bool *is_reset)
 			dev_err(dev, "%s [error status=0x%x] found\n",
 				 errs->msg, errs->int_msk);
 
-			if (HSEC_CORE_INT_STATUS_M_ECC & err_sts) {
-				err_val = readl(sec->qm.io_base +
+			if (SEC_CORE_INT_STATUS_M_ECC & err->int_msk) {
+				err_val = readl(qm->io_base +
 						SEC_CORE_SRAM_ECC_ERR_INFO);
 				dev_err(dev, "multi ecc sram num=0x%x\n",
-					 ((err_val >> SEC_ECC_NUM) &
-					  SEC_ECC_MASH));
+					 ((err_val) >> SEC_ECC_NUM) &
+					  SEC_ECC_MASH);
 			}
 
 			if (errs->reset_level == GLOBAL_RESET)
@@ -1005,16 +1005,16 @@ static void sec_err_info_init(struct hisi_qm *qm)
 static const struct hisi_qm_err_ini sec_err_ini = {
 	.hw_init		= sec_set_user_domain_and_cache,
 	.hw_err_enable		= sec_hw_error_enable,
-	.hw_err_disable		= sec_hw_err_disable,
-	.get_dev_hw_err_status		= sec_get_dev_hw_err_status,
-	.clear_dev_hw_err_status		= sec_clear_dev_hw_err_status,
-	.log_dev_hw_err		= sec_log_dev_hw_err,
+	.hw_err_disable		= sec_hw_error_disable,
+	.get_dev_hw_err_status		= sec_get_hw_err_status,
+	.clear_dev_hw_err_status		= sec_clear_hw_err_status,
+	.log_dev_hw_err		= sec_log_hw_error,
 	.open_axi_master_ooo		= sec_open_axi_master_ooo,
 	.open_sva_prefetch		= sec_open_sva_prefetch,
 	.close_sva_prefetch		= sec_close_sva_prefetch,
 	.show_last_dfx_regs		= sec_show_last_dfx_regs,
 	.err_info_init		= sec_err_info_init,
-}
+};
 
 static int sec_pf_probe_init(struct sec_dev *sec)
 {
@@ -1028,7 +1028,7 @@ static int sec_pf_probe_init(struct sec_dev *sec)
 	if (ret)
 		return ret;
 	
-	sec_open_sva_prefetch(qm;)
+	sec_open_sva_prefetch(qm);
 	hisi_qm_dev_err_init(qm);
 	sec_debug_regs_clear(qm);
 	ret = sec_show_last_regs_init(qm);
@@ -1109,7 +1109,7 @@ static void sec_probe_uninit(struct hisi_qm *qm)
 	destroy_workqueue(qm->wq);
 }
 
-static int hisi_sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+static int sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct sec_dev *sec;
 	struct hisi_qm *qm;
@@ -1122,7 +1122,7 @@ static int hisi_sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	qm = &sec->qm;
 	ret = sec_qm_init(qm, pdev);
 	if (ret) {
-		pci_err(pdev, "Failed to pre init SEC QM (%d)!\n", ret);
+		pci_err(pdev, "Failed to init SEC QM (%d)!\n", ret);
 		return ret;
 	}
 
@@ -1150,8 +1150,8 @@ static int hisi_sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hisi_qm_add_list(qm, &sec_devices);
 	ret = hisi_qm_alg_register(qm, &sec_devices, ctx_q_num);
-	if (ret) {
-		pci_err(pdev, "Failed to register driver to crypto.\n");
+	if (ret < 0) {
+		pr_err("Failed to register driver to crypto.\n");
 		goto err_qm_del_list;
 	}
 	
@@ -1168,7 +1168,7 @@ static int hisi_sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 err_alg_unregister:
 	hisi_qm_alg_unregister(qm, &sec_devices, ctx_q_num);
 err_qm_del_list:
-	hisi_qm_del_list(qm &sec_devices);
+	hisi_qm_del_list(qm, &sec_devices);
 err_qm_stop:
 	sec_debugfs_exit(qm);
 	hisi_qm_stop(qm, QM_NORMAL);
@@ -1204,9 +1204,9 @@ static void sec_remove(struct pci_dev *pdev)
 	sec_qm_uninit(qm);
 }
 
-static const struct dev_pm_ops sec_pm_ops {
+static const struct dev_pm_ops sec_pm_ops = {
 	SET_RUNTIME_PM_OPS(hisi_qm_suspend, hisi_qm_resume, NULL)
-}
+};
 
 static const struct pci_error_handlers sec_err_handler = {
 	.error_detected = hisi_qm_dev_err_detected,
@@ -1215,7 +1215,7 @@ static const struct pci_error_handlers sec_err_handler = {
 	.reset_done = hisi_qm_reset_done,
 };
 
-static struct pci_driver hisi_sec_pci_driver = {
+static struct pci_driver sec_pci_driver = {
 	.name = "hisi_sec2",
 	.id_table = sec_dev_ids,
 	.probe = sec_probe,
@@ -1226,7 +1226,7 @@ static struct pci_driver hisi_sec_pci_driver = {
 	.driver.pm = &sec_pm_ops,
 };
 
-static void hisi_sec_register_debugfs(void)
+static void sec_register_debugfs(void)
 {
 	if (!debugfs_initialized())
 		return;
@@ -1256,7 +1256,7 @@ static int __init sec_init(void)
 	return 0;
 }
 
-static void __exitsec_exit(void)
+static void __exit sec_exit(void)
 {
 	pci_unregister_driver(&sec_pci_driver);
 	sec_unregister_debugfs();
@@ -1266,6 +1266,8 @@ module_init(sec_init);
 module_exit(sec_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Zhang Wei <zhangwei375@huawei.com>");
+MODULE_AUTHOR("Zaibo Xu <xuzaibo@huawei.com>");
+MODULE_AUTHOR("Longfang Liu <liulongfang@huawei.com>");
+MODULE_AUTHOR("Kai Ye <yekai13@huawei.com>");
+MODULE_AUTHOR("Wei Zhang <zhangwei375@huawei.com>");
 MODULE_DESCRIPTION("Driver for HiSilicon SEC accelerator");
-MODULE_VERSION("1.1.10");
