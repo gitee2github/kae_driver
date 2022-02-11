@@ -25,7 +25,7 @@
 #define SW_DRBG_KEY_BASE 0x082C
 #define SW_DRBG_SEED(n) (SW_DRBG_KEY_BASE - ((n) << SW_DRBG_NUM_SHIFT))
 #define SW_DRBG_SEED_REGS_NUM 12
-#define SW_DRBG_SEED_SIZW 48
+#define SW_DRBG_SEED_SIZE 48
 #define MAX_QUEUE 1024
 #define HISI_TRNG_PAGE_NR 1
 #define SW_DRBG_CRYPTO_ALG_PRI 300
@@ -34,14 +34,14 @@
 #define SW_DRBG_GEN 0x083c
 #define SW_DRBG_STATUS 0x0840
 #define SW_DRBG_BLOCKS_NUM 4095
-#define SW_DRBG_DARA_BASE 0x0850
+#define SW_DRBG_DATA_BASE 0x0850
 #define SW_DRBG_DATA_NUM 4
 #define SW_DRBG_DATA(n) (SW_DRBG_DATA_BASE - ((n) << SW_DRBG_NUM_SHIFT))
 #define SW_DRBG_BYTES 16
 #define SW_DRBG_ENABLE_SHIFT 12
-#define SEED_SHITF_24 24
-#define SEED_SHITF_16 16
-#define SEED_SHITF_8 8
+#define SEED_SHIFT_24 24
+#define SEED_SHIFT_16 16
+#define SEED_SHIFT_8 8
 
 struct hisi_trng;
 struct trng_queue{
@@ -57,9 +57,9 @@ struct hisi_trng_list{
 };
 
 struct hisi_trng{
-    voidd __iomen *base;
+    void __iomem *base;
     struct hisi_trng_list *trng_list;
-    struct list_headd list;
+    struct list_head list;
     struct hwrng rng;
     u32 drbg_used;
     u32 ver;
@@ -74,16 +74,18 @@ struct hisi_trng{
 
 struct hisi_trng_ctx{
     struct hisi_trng *trng;
-    struct cypto_rng *drbg;
+    struct crypto_rng *drbg;
 };
 
 static atomic_t trng_active_devs;
 static struct hisi_trng_list trng_devices;
 
-static void hisi_trng_set_seed(struct hisi_trng *trng, const u8 *seed){
+static void hisi_trng_set_seed(struct hisi_trng *trng, const u8 *seed)
+{
     u32 val, seed_reg, i;
 
-    for(i = 0; i < SW_DRBG_SEED_SIZE; i += SW_DRBG_SEED_SIZE / SW_DRBG_SEED_REGS_NUM){
+    for(i = 0; i < SW_DRBG_SEED_SIZE;
+         i += SW_DRBG_SEED_SIZE / SW_DRBG_SEED_REGS_NUM){
         val = seed[i] << SEED_SHIFT_24;
         val |= seed[i + 1UL] << SEED_SHIFT_16;
         val |= seed[i + 2UL] << SEED_SHIFT_8;
@@ -94,7 +96,9 @@ static void hisi_trng_set_seed(struct hisi_trng *trng, const u8 *seed){
     }
 }
 
-static int hisi_trng_seed(struct crypto_rng *tfm, const u8 *seed, unsigned int slen){
+static int hisi_trng_seed(struct crypto_rng *tfm, const u8 *seed,
+        unsigned int slen)
+{
     struct hisi_trng_ctx *ctx = crypto_rng_ctx(tfm);
     struct crypto_rng *drbg = ctx->drbg;
     struct hisi_trng *trng =ctx->trng;
@@ -102,7 +106,8 @@ static int hisi_trng_seed(struct crypto_rng *tfm, const u8 *seed, unsigned int s
     int ret = 0;
 
     if(slen < SW_DRBG_SEED_SIZE){
-        pr_err("slen(%u) is not matched with trng(%d)\n",slen,SW_DRBG_SEED_SIZE);
+        pr_err("slen(%u) is not matched with trng(%d)\n", slen,
+            SW_DRBG_SEED_SIZE);
         return -EINVAL;
     }
 
@@ -114,17 +119,21 @@ static int hisi_trng_seed(struct crypto_rng *tfm, const u8 *seed, unsigned int s
     writel(0x0, trng->base +SW_DRBG_BLOCKS);
     hisi_trng_set_seed(trng,seed);
 
-    writel(SW_DRBG_BLOCKS_NUM | (0x1 << SW_DRBG_ENABLE_SHIFT), trng->base + SW_DRBG_BLOCKS);
+    writel(SW_DRBG_BLOCKS_NUM | (0x1 << SW_DRBG_ENABLE_SHIFT),
+        trng->base + SW_DRBG_BLOCKS);
     writel(0x1,trng->base + SW_DRBG_INIT);
 
-    ret = readl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS, val, val & BIT(0), SLEEP_US, TIMEOUT_US);
+    ret = readl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS,
+        val, val & BIT(0), SLEEP_US, TIMEOUT_US);
     
     if(ret)
         pr_err("fail to init trng(%d)\n",ret);
     return ret;
 }
 
-static int hisi_trng_generate(struct crypto_rng *tfm, const u8 *src, unsigned int slen, u8 *dstn, unsigned int dlen){
+static int hisi_trng_generate(struct crypto_rng *tfm, const u8 *src,
+            unsigned int slen, u8 *dstn, unsigned int dlen)
+{
     struct hisi_trng_ctx *ctx = crypto_rng_ctx(tfm);
     struct crypto_rng *drbg = ctx ->drbg;
     struct hisi_trng *trng = ctx->trng;
@@ -134,11 +143,18 @@ static int hisi_trng_generate(struct crypto_rng *tfm, const u8 *src, unsigned in
     int ret;
     u32 i;
 
+    if (dlen > SW_DRBG_BLOCKS_NUM * SW_DRBG_BYTES || dlen == 0) {
+        pr_err("dlen(%u) exceeds limit(%d)!\n", dlen,
+            SW_DRBG_BLOCKS_NUM * SW_DRBG_BYTES);
+        return -EINVAL;
+    }
+
     if(drbg)
         return crypto_rng_generate(drbg,src,slen,dstn,dlen);
     
     do{
-        ret = reeadl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS, val, val & BIT(1), SLEEP_US, TIMEOUT_US);
+        ret = reeadl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS,
+            val, val & BIT(1), SLEEP_US, TIMEOUT_US);
         if(ret){
             pr_err("fail to generate random number(%d)!\n",ret);
             break;
@@ -161,16 +177,17 @@ static int hisi_trng_generate(struct crypto_rng *tfm, const u8 *src, unsigned in
     return ret;
 }
 
-static int hisi_trng_init(struct crypto_tfm *tfm){
+static int hisi_trng_init(struct crypto_tfm *tfm)
+{
     struct hisi_trng_ctx *ctx = crypto_tfm_ctx(tfm);
     struct hisi_trng *trng;
     int ret = 0;
 
     mutex_lock(&trng_devices.lock);
-    list_for_each_entry(trng,&trng_devixes.list,list){
+    list_for_each_entry(trng,&trng_devices.list,list){
         if(!trng->is_used){
             trng->is_used = true;
-            trng->drbg_uesd++l
+            trng->drbg_used++;
             ctx->trng = trng;
             break;
         }
@@ -180,7 +197,7 @@ static int hisi_trng_init(struct crypto_tfm *tfm){
     if(!ctx->trng){
         ctx->drbg = crypto_alloc_rng("drbg_nopr_ctr_aes256", 0, 0);
         if(IS_ERR(ctx->drbg)){
-            pr_err("can not alloc rng!\n");
+            pr_err("Can not alloc rng!\n");
             ret = PTR_ERR(ctx->drbg);
             return ret;
         }
@@ -191,15 +208,17 @@ static int hisi_trng_init(struct crypto_tfm *tfm){
             crypto_free_rng(ctx->drbg);
             return -ENODEV;
         }
-        trng = list_first_entry(&trng_devices.list, struct hisi_trng, list);
+        trng = list_first_entry(&trng_devices.list,
+                struct hisi_trng, list);
         trng -> drbg_used++;
         ctx->trng = trng;
-        metex_unlock(&trng_devices.lock);
+        mutex_unlock(&trng_devices.lock);
     }
     return ret;
 }
 
-static void hisi_trng_exit(struct crypto_tfm *tfm){
+static void hisi_trng_exit(struct crypto_tfm *tfm)
+{
     struct hisi_trng_ctx *ctx = crypto_tfm_ctx(tfm);
     mutex_lock(&trng_devices.lock);
     if(!ctx->drbg)
@@ -210,7 +229,8 @@ static void hisi_trng_exit(struct crypto_tfm *tfm){
     mutex_unlock(&trng_devices.lock);
 }
 
-static init hisi_trng_read(struct hwrng *rng, void *buf, size_t max, book wait){
+static int hisi_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
+{
     struct hisi_trng *trng;
     int currsize = 0;
     u32 val = 0;
@@ -218,7 +238,8 @@ static init hisi_trng_read(struct hwrng *rng, void *buf, size_t max, book wait){
     
     trng = container_of(rng,struct hisi_trng,rng);
     do{
-        ret = readl_poll_timeout(trng->base+HISI_TRNG_REG,val,val,SLEEP_US,TIMEOUT_US);
+        ret = readl_poll_timeout(trng->base + HISI_TRNG_REG,
+            val, val, SLEEP_US, TIMEOUT_US);
         if(ret)
             return currsize;
         if(max-currsize >= HISI_TRNG_BYTES){
@@ -235,15 +256,18 @@ static init hisi_trng_read(struct hwrng *rng, void *buf, size_t max, book wait){
     return currsize;
 }
 
-static int uacce_mode_set(const char *val,const struct kernel_param *kp){
+static int uacce_mode_set(const char *val,const struct kernel_param *kp)
+{
     int ret;
     u32 n;
 
-    if(val) return -EINVAL;
-    ret = kstrtou32(val,10,&n);
-    if(ret != 0 || (n != UACCE_MODE_NOIOMMU && n != UACCE_MODE_NOUACCE))
+    if (!val)
         return -EINVAL;
-    return param_set_init(val,kp);
+    ret = kstrtou32(val,10,&n);
+    if (ret != 0 || (n != UACCE_MODE_NOIOMMU &&
+            n != UACCE_MODE_NOUACCE))
+        return -EINVAL;
+    return param_set_int(val,kp);
 }
 
 static const struct kernel_param_ops uacce_mode_ops ={
@@ -252,10 +276,11 @@ static const struct kernel_param_ops uacce_mode_ops ={
 };
 
 static int uacce_mode = UACCE_MODE_NOUACCE;
-module_param_cb(uacce_mode,&uacce_mode_ops.&uacce_mode,0444);
-MODULE_PARAM_DESC(uacce_mode,"Mode of UACCE can be 0(default), 2");
+module_param_cb(uacce_mode,&uacce_mode_ops, &uacce_mode,0444);
+MODULE_PARM_DESC(uacce_mode,"Mode of UACCE can be 0(default), 2");
 
-static int hisi_trng_get_available_instances(struct uacce_device *uacce){
+static int hisi_trng_get_available_instances(struct uacce_device *uacce)
+{
     struct hisi_trng *trng = uacce->priv;
     int i,ret;
     mutex_lock(&trng->mutex);
@@ -267,15 +292,17 @@ static int hisi_trng_get_available_instances(struct uacce_device *uacce){
     return ret;
 }
 
-static int hisi_trng_get_queue(struct uacce_device *uacce, unsigned long arg, struct uacce_queue *q){
+static int hisi_trng_get_queue(struct uacce_device *uacce, unsigned long arg,
+                            struct uacce_queue *q)
+{
     struct hisi_trng *trng = uacce->priv;
     int i;
     mutex_lock(&trng->mutex);
     for(i = 0; i < MAX_QUEUE; i++){
         if(!trng->qs[i].used){
-            trng->qa[i].used = true;
-            trng->pq_used++;
-            q->pric = &trng->qs[i];
+            trng->qs[i].used = true;
+            trng->qp_used++;
+            q->priv = &trng->qs[i];
             q->uacce = uacce;
             break;
         }
@@ -286,7 +313,8 @@ static int hisi_trng_get_queue(struct uacce_device *uacce, unsigned long arg, st
     return -ENODEV;
 }
 
-static void hisi_trng_put_queue(struct uacce_queue *q){
+static void hisi_trng_put_queue(struct uacce_queue *q)
+{
     struct trng_queue *trng_queue = q->priv;
     struct hisi_trng *trng = trng_queue->trng;
 
@@ -306,15 +334,17 @@ static void hisi_trng_stop_queue(struct uacce_queue *q)
 
 }
 
-static int hisi_trng_mmap(struct uacce_queue *q,struct vm_area_struct *vma, struct uacce_qfile_region *qfr)
+static int hisi_trng_mmap(struct uacce_queue *q,struct vm_area_struct *vma,
+                struct uacce_qfile_region *qfr)
 {
     struct trng_queue *trng_queue = q->priv;
     struct hisi_trng *trng = trng_queue -> trng;
     size_t sz = vma->vm_end - vma->vm_start;
 
-    return remap_pfn_range(vma,vma->vm_start,trng->base_pa >> PAGE_SHIFT,sz,pgprot_noncached(vma->vm_page_prot));
-    
-};
+    return remap_pfn_range(vma, vma->vm_start,
+            trng->base_pa >> PAGE_SHIFT,
+            sz, pgprot_noncached(vma->vm_page_prot));
+}
 
 static enum uacce_dev_state hisi_trng_get_state(struct uacce_device *uacce)
 {
@@ -329,11 +359,11 @@ static int hisi_trng_frozen(struct hisi_trng *trng)
         trng->qp_used = MAX_QUEUE;
         ret = 0;
     }
-    metex_unlock(&trng->mutex);
+    mutex_unlock(&trng->mutex);
     return ret;
 }
 
-static struct uscce_ops uacce_trng_ops = {
+static struct uacce_ops uacce_trng_ops = {
     .get_queue = hisi_trng_get_queue,
     .put_queue = hisi_trng_put_queue,
     .start_queue = hisi_trng_start_queue,
@@ -343,15 +373,17 @@ static struct uscce_ops uacce_trng_ops = {
     .get_dev_state = hisi_trng_get_state,
 };
 
-static int trng_alloc_uacce(struct hisi_trng *trng, struct platform_device *pdev)
+static int trng_alloc_uacce(struct hisi_trng *trng,
+            struct platform_device *pdev)
 {
     struct uacce_interface interface;
     struct uacce_device *uacce;
     int name_len;
 
     name_len = strlen(pdev->dev.driver->name);
-    if(name_len >= UACCCE_MAX_NAME_SIZE){
-        dev_err(&pdev->dev,"The driver name(%d) is longer than %d!\n", name_len,UACCE_MAX_NAME_SIZE);
+    if(name_len >= UACCE_MAX_NAME_SIZE){
+        dev_err(&pdev->dev,"The driver name(%d) is longer than %d!\n",
+                name_len, UACCE_MAX_NAME_SIZE);
         return -EINVAL;
     }
 
@@ -368,30 +400,30 @@ static int trng_alloc_uacce(struct hisi_trng *trng, struct platform_device *pdev
     }
 
     uacce->qf_pg_num[UACCE_QFRT_MMIO] = HISI_TRNG_PAGE_NR;
-    uacce->qf_pg_num[UACCE_QFRT_DUS] = UACCE_QFA_NA;
+    uacce->qf_pg_num[UACCE_QFRT_DUS] = UACCE_QFR_NA;
     uacce->isolate = &uacce->isolate_data;
     uacce->api_ver = "hisi-trng-v2";
     uacce->algs = "trng";
     uacce->priv = trng;
-    uscce_is_vf = false;
+    uacce->is_vf = false;
     trng->uacce = uacce;
 
     return 0;
 }
 
 
-static int trng_register_uacce(struct hisi_trng *trng, struct platform_device *pdev)
+static int trng_register_uacce(struct hisi_trng *trng,
+            struct platform_device *pdev)
 {
     struct resource *res;
     int i, ret;
 
     if(uacce_mode != UACCE_MODE_NOIOMMU)
         return 0;
-    res = platform_get_resource(pdev,IORESOURCE_MEN,0);
-    if (!res)
-    {
+    res = platform_get_resource(pdev,IORESOURCE_MEM,0);
+    if (!res) {
         dev_err(&pdev->dev,"failed to get resource\n");
-        return -ENOMEN;
+        return -ENOMEM;
     }
     trng->base_pa = res->start;
     for(i = 0; i < MAX_QUEUE; i++) {
@@ -405,17 +437,17 @@ static int trng_register_uacce(struct hisi_trng *trng, struct platform_device *p
     if(ret)
         return ret;
     dev_info(&pdev->dev,"trng register to uacce\n");
-    ret = uacce_register(trng->uadcce);
+    ret = uacce_register(trng->uacce);
     if(ret)
         uacce_remove(trng->uacce);
 
     return ret;
 }
 
-static struct rng_alf hisi_trng_alg = {
+static struct rng_alg hisi_trng_alg = {
     .generate = hisi_trng_generate,
-    .seed = hisi_trng_stop_seed,
-    .seedsize = SW_DEBG_SEED_SIZE,
+    .seed = hisi_trng_seed,
+    .seedsize = SW_DRBG_SEED_SIZE,
     .base = {
         .cra_name = "stdrng",
         .cra_driver_name = "hisi_stdrng",
@@ -429,23 +461,22 @@ static struct rng_alf hisi_trng_alg = {
 
 static void hisi_trng_add_to_list(struct hisi_trng *trng)
 {
-    metex_lock(&trng_devices.lock);
+    mutex_lock(&trng_devices.lock);
     list_add_tail(&trng->list, &trng_devices.list);
-    metex_unlock(&trng_devices.lock);
+    mutex_unlock(&trng_devices.lock);
 }
 
-static int hisi_trng_del_from_list(truct hisi_trng *trng)
+static int hisi_trng_del_from_list(struct hisi_trng *trng)
 {
     int ret = -EBUSY;
 
-    metex_lock(&trng_devices.lock);
-    if (!trng->drbg_used)
-    {
+    mutex_lock(&trng_devices.lock);
+    if (!trng->drbg_used) {
         list_del(&trng->list);
         ret = 0;
     }
     
-    metex_unlock(&trng_devices.lock);
+    mutex_unlock(&trng_devices.lock);
     return ret;
 }
 
@@ -456,9 +487,7 @@ static int hisi_trng_probe(struct platform_device *pdev)
 
     trng = devm_kzalloc(&pdev->dev, sizeof(*trng), GFP_KERNEL);
     if (!trng)
-    {
         return -ENOMEM;
-    }
     
     platform_set_drvdata(pdev, trng);
     trng->base = devm_platform_ioremap_resource(pdev,0);
@@ -466,7 +495,7 @@ static int hisi_trng_probe(struct platform_device *pdev)
         return PTR_ERR(trng->base);
 
     trng->is_used = false;
-    trng->drbg_used = 0; = false;
+    trng->drbg_used = 0;
     trng->ver = readl(trng->base + HISI_TRNG_VERSION);
     if (!trng_devices.is_init) {
         INIT_LIST_HEAD(&trng_devices.list);
@@ -489,7 +518,7 @@ static int hisi_trng_probe(struct platform_device *pdev)
     trng->rng.name = pdev->name;
     trng->rng.read = hisi_trng_read;
     trng->rng.quality = HISI_TRNG_QUALITY;
-    ret = devm_hwrng_regiuster(&pdev->dev, &trng->rng);
+    ret = devm_hwrng_register(&pdev->dev, &trng->rng);
     if (ret) {
         dev_err(&pdev->dev, "failed to register hwrng: %d!\n", ret);
         goto err_crypto_unregister;
@@ -497,7 +526,7 @@ static int hisi_trng_probe(struct platform_device *pdev)
 
     ret = trng_register_uacce(trng, pdev);
     if (ret) {
-        dev_err(&pdev->dev, "failed to register uacce: %d!\n", ret);
+        dev_err(&pdev->dev, "failed to register uacce (%d)!\n", ret);
         goto err_crypto_unregister;
     }
 
