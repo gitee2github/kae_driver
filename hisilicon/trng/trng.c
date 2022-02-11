@@ -153,7 +153,7 @@ static int hisi_trng_generate(struct crypto_rng *tfm, const u8 *src,
         return crypto_rng_generate(drbg,src,slen,dstn,dlen);
     
     do{
-        ret = reeadl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS,
+        ret = readl_relaxed_poll_timeout(trng->base + SW_DRBG_STATUS,
             val, val & BIT(1), SLEEP_US, TIMEOUT_US);
         if(ret){
             pr_err("fail to generate random number(%d)!\n",ret);
@@ -238,8 +238,8 @@ static int hisi_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
     
     trng = container_of(rng,struct hisi_trng,rng);
     do{
-        ret = readl_poll_timeout(trng->base + HISI_TRNG_REG,
-            val, val, SLEEP_US, TIMEOUT_US);
+        ret = readl_poll_timeout(trng->base + HISI_TRNG_REG, val,
+                    val, SLEEP_US, TIMEOUT_US);
         if(ret)
             return currsize;
         if(max-currsize >= HISI_TRNG_BYTES){
