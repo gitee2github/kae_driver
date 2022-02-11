@@ -28,8 +28,8 @@
 #define SEC_XTS_MIN_KEY_SIZE (2 * AES_MIN_KEY_SIZE)
 #define SEC_XTS_MID_KEY_SIZE (3 * AES_MIN_KEY_SIZE)
 #define SEC_XTS_MAX_KEY_SIZE (2 * AES_MAX_KEY_SIZE)
-#define SEC_DES3_2KEY_SIZE (2 * SEC_DES3_3KEY_SIZE)
-#define SEC_DES3_3KEY_SIZE (3 * SEC_DES3_3KEY_SIZE)
+#define SEC_DES3_2KEY_SIZE (2 * DES_KEY_SIZE)
+#define SEC_DES3_3KEY_SIZE (3 * DES_KEY_SIZE)
 
 /* SEC sqe(bd) bit operational relative MACRO */
 #define SEC_DE_OFFSET		1
@@ -208,7 +208,7 @@ static void sec_free_stream_id(struct sec_ctx *ctx, int stream_id)
 	}
 
 	mutex_lock(&ctx->stream_idr_lock);
-	idr_remove(&ctx->stream_id, stream_idr);
+	idr_remove(&ctx->stream_idr, stream_id);
 	mutex_unlock(&ctx->stream_idr_lock);
 }
 
@@ -1137,7 +1137,7 @@ static int sec_cipher_map(struct sec_ctx *ctx, struct sec_req *req,
 								req->req_id,
 								&c_req->c_out_dma);
 		
-		if (ISERR(c_req->c_out)) {
+		if (IS_ERR(c_req->c_out)) {
 			dev_err(dev, "fail to dma map output sgl buffers!\n");
 			hisi_acc_sg_buf_unmap(dev, src, req->in);
 			return PTR_ERR(c_req->c_out);
@@ -2105,7 +2105,7 @@ static void sec_auth_bd_fill_ex_v3(struct sec_auth_ctx *ctx, int dir,
 
 	sqe3->auth_mac_key |= 
 			cpu_to_le32((u32)(ctx->a_key_len /
-			SEC_SQE_LEN_RATE) << SEC_MAC_OFFSET_V3);
+			SEC_SQE_LEN_RATE) << SEC_AKEY_OFFSET_V3);
 
 	sqe3->auth_mac_key |=
 			cpu_to_le32((u32)(ctx->a_alg) << SEC_AUTH_ALG_OFFSET_V3);
@@ -3239,7 +3239,7 @@ static struct skcipher_alg sec_skciphers[] = {
 			SEC_DES3_3KEY_SIZE, SEC_DES3_3KEY_SIZE,
 			DES3_EDE_BLOCK_SIZE, 0),
 
-	SEC_SKCIPHER_ALG("cbc(des3_ede)", sec_setkey_des_cbc,
+	SEC_SKCIPHER_ALG("cbc(des3_ede)", sec_setkey_3des_cbc,
 			SEC_DES3_3KEY_SIZE, SEC_DES3_3KEY_SIZE,
 			DES3_EDE_BLOCK_SIZE, DES3_EDE_BLOCK_SIZE),
 
@@ -3448,7 +3448,7 @@ static int sec_aead_decrypt(struct aead_request *a_req)
 static int sec_setkey_##name(struct crypto_aead *tfm, const u8 *key,	\
 	u32 keylen)															\
 {																		\
-	return sec_aead_set_key(tfm, key, keylen, aalg, calg, maclen, cmode);\
+	return sec_aead_setkey(tfm, key, keylen, aalg, calg, maclen, cmode);\
 }
 
 GEN_SEC_AEAD_SETKEY_FUNC(aes_cbc_sha1, SEC_A_HMAC_SHA1,
