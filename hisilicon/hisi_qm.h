@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note*/
-#ifndef HISI_QM_USR_IF_H
-#define HISI_QM_USR_IF_H
+#ifndef _UAPI_HISI_QM_H
+#define _UAPI_HISI_QM_H
 
 #define QM_CQE_SIZE			16
 
@@ -42,7 +42,7 @@ struct hisi_qp_ctx {
 
 #define HISI_QM_API_VER_BASE "hisi_qm_v1"
 #define HISI_QM_API_VER2_BASE "hisi_qm_v2"
-#define HISI_QM_API_VER3_BASE "hisi_qm_v2"
+#define HISI_QM_API_VER3_BASE "hisi_qm_v3"
 
 /* UACCE_CMD_QM_SET_QP_CTX: set qp algorithm type */
 #define UACCE_CMD_QM_SET_QP_CTX	_IOWR('H', 10, struct hisi_qp_ctx)
