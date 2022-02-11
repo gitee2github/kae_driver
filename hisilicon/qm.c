@@ -1170,7 +1170,7 @@ static void qm_init_prefetch(struct hisi_qm *qm)
 }
 
 /*
- * acc_sahper_para_calc() Get the IR value by the qos formula, the returm value
+ * acc_sahper_para_calc() Get the IR value by the qos formula, the return value
  * is the expected qos calculated.
  * the formula:
  * IR = X Mbps if ir = 1 means IR = 100 Mbps, if ir = 10000 means = 10Gbps
