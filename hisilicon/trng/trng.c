@@ -12,6 +12,7 @@
 #include <linux/random.h>
 #include "../../include_uapi_linux/uacce.h"
 #include "../../include_linux/uacce.h"
+#include "../hisi_acc_qm.h"
 #include <crypto/internal/rng.h>
 
 #define HISI_TRNG_REG 0x00F0
@@ -256,28 +257,14 @@ static int hisi_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
     return currsize;
 }
 
-static int uacce_mode_set(const char *val,const struct kernel_param *kp)
-{
-    int ret;
-    u32 n;
-
-    if (!val)
-        return -EINVAL;
-    ret = kstrtou32(val,10,&n);
-    if (ret != 0 || (n != UACCE_MODE_NOIOMMU &&
-            n != UACCE_MODE_NOUACCE))
-        return -EINVAL;
-    return param_set_int(val,kp);
-}
-
 static const struct kernel_param_ops uacce_mode_ops ={
     .set = uacce_mode_set,
     .get = param_get_int,
 };
 
-static int uacce_mode = UACCE_MODE_NOUACCE;
+static int uacce_mode = UACCE_MODE_NOSVA;
 module_param_cb(uacce_mode,&uacce_mode_ops, &uacce_mode,0444);
-MODULE_PARM_DESC(uacce_mode,"Mode of UACCE can be 0(default), 2");
+MODULE_PARM_DESC(uacce_mode,"Mode of UACCE can be 0, 1, 2(default)");
 
 static int hisi_trng_get_available_instances(struct uacce_device *uacce)
 {

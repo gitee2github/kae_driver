@@ -133,6 +133,7 @@
 /* uacce mode of the driver */
 #define UACCE_MODE_NOUACCE		0
 #define UACCE_MODE_SVA			1
+#define UACCE_MODE_NOSVA			2
 #define UACCE_MODE_DESC	"0(default) means only register to crypto, 1 means both register to crypto and uacce"
 
 struct hisi_qm;
