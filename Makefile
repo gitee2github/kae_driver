@@ -22,7 +22,7 @@ defaul:
 		CONFIG_CRYPTO_DEV_HISI_ZIP=m \
 		CONFIG_CRYPTO_DEV_HISI_HPRE=m \
 		CONFIG_CRYPTO_DEV_HISI_SEC2=m \
-		CONFIG_CRYPTO_DEV_HISI_RDE=m
+		CONFIG_CRYPTO_DEV_HISI_TRNG=m
 #copy:
 #	cp -f $(shell pwd)/include_linux/uacce.h $(KSP)/include/linux
 #	cp -f $(shell pwd)/include_uapi_linux/uacce.h $(KSP)/include/uapi/linux
@@ -39,9 +39,11 @@ install:
 	-modprobe hisi_sec2 uacce_mode=2 enable_sm4_ctr=1 pf_q_num=256
 	-modprobe hisi_hpre uacce_mode=2 pf_q_num=256
 	-modprobe hisi_zip  uacce_mode=2 pf_q_num=256
+	-modprobe hisi_trng_v2  uacce_mode=2 pf_q_num=256
 	-echo "options hisi_sec2 uacce_mode=2 enable_sm4_ctr=1 pf_q_num=256" > /etc/modprobe.d/hisi_sec2.conf
 	-echo "options hisi_hpre uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_hpre.conf
 	-echo "options hisi_zip  uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_zip.conf
+	-echo "options hisi_trng_v2 uacce_mode=1 pf_q_num=256" > /etc/modprobe.d/hisi_trng_v2.conf
 uninstall:
 	modprobe -r hisi_zip
 	modprobe -r hisi_hpre
@@ -56,9 +58,8 @@ uninstall:
 	rm -rf /etc/modprobe.d/hisi_sec2.conf
 	rm -rf /etc/modprobe.d/hisi_hpre.conf
 	rm -rf /etc/modprobe.d/hisi_zip.conf
+	rm -rf /etc/modprobe.d/hisi_trng_v2.conf
 	depmod -a
 
 clean:
-	rm -f $(KSP)/include/linux/uacce.h
-	rm -f $(KSP)/include/uapi/linux/uacce.h
 	rm -rf $(TARGET) 
