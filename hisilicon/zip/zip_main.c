@@ -317,9 +317,9 @@ static const struct kernel_param_ops uacce_mode_ops = {
 	.get = param_get_int,
 };
 
-static int uacce_mode = UACCE_MODE_NOUACCE;
+static int uacce_mode = UACCE_MODE_NOSVA;
 module_param_cb(uacce_mode, &uacce_mode_ops, &uacce_mode, 0444);
-MODULE_PARM_DESC(uacce_mode, "Mode of UACCE can be 0(default), 1, 2");
+MODULE_PARM_DESC(uacce_mode, "Mode of UACCE can be 0, 1, 2(default)");
 
 static int pf_q_num_set(const char *val, const struct kernel_param *kp)
 {

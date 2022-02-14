@@ -368,9 +368,9 @@ static const struct kernel_param_ops sec_uacce_mode_ops = {
 	.get = param_get_int,
 };
 
-static u32 uacce_mode = UACCE_MODE_NOUACCE;
+static u32 uacce_mode = UACCE_MODE_NOSVA;
 module_param_cb(uacce_mode, &sec_uacce_mode_ops, &uacce_mode, 0444);
-MODULE_PARM_DESC(uacce_mode, "Mode of UACCE can be 0(default), 1, 2");
+MODULE_PARM_DESC(uacce_mode, "Mode of UACCE can be 0, 1, 2(default)");
 
 static const struct pci_device_id sec_dev_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_HUAWEI, SEC_PF_PCI_DEVICE_ID) },

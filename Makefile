@@ -43,7 +43,7 @@ install:
 	-echo "options hisi_sec2 uacce_mode=2 enable_sm4_ctr=1 pf_q_num=256" > /etc/modprobe.d/hisi_sec2.conf
 	-echo "options hisi_hpre uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_hpre.conf
 	-echo "options hisi_zip  uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_zip.conf
-	-echo "options hisi_trng_v2 uacce_mode=1 pf_q_num=256" > /etc/modprobe.d/hisi_trng_v2.conf
+	-echo "options hisi_trng_v2 uacce_mode=2 pf_q_num=256" > /etc/modprobe.d/hisi_trng_v2.conf
 uninstall:
 	modprobe -r hisi_zip
 	modprobe -r hisi_hpre
